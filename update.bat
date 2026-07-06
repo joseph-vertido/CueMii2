@@ -11,7 +11,7 @@ echo   BADDIXX CueMii App Updater
 echo ========================================
 echo.
 
-set REPO_URL=https://github.com/joseph-vertido/CueMii/archive/refs/heads/main.zip
+set REPO_URL=https://github.com/joseph-vertido/CueMii2/archive/refs/heads/main.zip
 set TEMP_ZIP=%TEMP%\cuemii-update.zip
 set TEMP_DIR=%TEMP%\cuemii-update
 
@@ -43,7 +43,7 @@ echo [3/5] Extracting files...
 mkdir "%TEMP_DIR%" 2>nul
 powershell -Command "Expand-Archive -Path '%TEMP_ZIP%' -DestinationPath '%TEMP_DIR%' -Force"
 
-if not exist "%TEMP_DIR%\CueMii-main" (
+if not exist "%TEMP_DIR%\CueMii2-main" (
     echo.
     echo ERROR: Failed to extract update. The downloaded file may be corrupted.
     echo.
@@ -54,7 +54,7 @@ if not exist "%TEMP_DIR%\CueMii-main" (
 echo [4/5] Updating files...
 REM Copy all files from the extracted folder to current directory
 REM Note: node_modules is excluded from the repo, so it won't be downloaded
-xcopy /s /e /y "%TEMP_DIR%\CueMii-main\*" "." >nul
+xcopy /s /e /y "%TEMP_DIR%\CueMii2-main\*" "." >nul
 
 echo [5/5] Cleaning up...
 del "%TEMP_ZIP%" 2>nul

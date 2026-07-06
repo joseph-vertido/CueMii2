@@ -11,7 +11,7 @@ echo "  BADDIXX CueMii App Updater"
 echo "========================================"
 echo ""
 
-REPO_URL="https://github.com/joseph-vertido/CueMii/archive/refs/heads/main.zip"
+REPO_URL="https://github.com/joseph-vertido/CueMii2/archive/refs/heads/main.zip"
 TEMP_ZIP="/tmp/cuemii-update.zip"
 TEMP_DIR="/tmp/cuemii-update"
 
@@ -46,7 +46,7 @@ echo "[3/5] Extracting files..."
 mkdir -p "$TEMP_DIR"
 unzip -q "$TEMP_ZIP" -d "$TEMP_DIR"
 
-if [ ! -d "$TEMP_DIR/CueMii-main" ]; then
+if [ ! -d "$TEMP_DIR/CueMii2-main" ]; then
     echo ""
     echo "ERROR: Failed to extract update. The downloaded file may be corrupted."
     echo ""
@@ -55,7 +55,7 @@ fi
 
 echo "[4/5] Updating files..."
 # Copy all files from the extracted folder to current directory
-cp -R "$TEMP_DIR/CueMii-main/"* .
+cp -R "$TEMP_DIR/CueMii2-main/"* .
 
 echo "[5/5] Cleaning up..."
 rm -f "$TEMP_ZIP"

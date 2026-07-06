@@ -1,5 +1,8 @@
 // App Version
-export const APP_VERSION = '4.0.37';
+// NOTE: Keep this in sync with the "version" field in package.json.
+// Run `npm run version:patch|minor|major` (or node scripts/bump-version.js)
+// to update both automatically. See CHANGELOG.md for release history.
+export const APP_VERSION = '4.0.38';
 
 // Initial player database from baddixx_players_20260211.csv
 export const initialPlayers = [

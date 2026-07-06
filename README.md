@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 4.0.37**
+**Version 4.0.38**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -44,9 +44,12 @@ baddixx-app/
 │   ├── App.js                    # Main application component
 │   ├── index.js                  # React entry point
 │   └── index.css                 # Tailwind CSS + custom styles
+├── scripts/
+│   └── bump-version.js           # Bumps package.json + APP_VERSION together
 ├── package.json
 ├── tailwind.config.js
 ├── postcss.config.js
+├── CHANGELOG.md                  # Release history (canonical)
 └── README.md
 ```
 
@@ -158,7 +161,55 @@ All application data is automatically saved to your browser's localStorage:
 
 Data persists across browser refreshes and sessions. Use the **Reset** button in the header to clear all saved data and restore defaults.
 
+## Versioning & Releases
+
+The app follows [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`:
+
+- **MAJOR** — incompatible or sweeping changes (data model, redesign)
+- **MINOR** — new features, backwards-compatible
+- **PATCH** — bug fixes and small tweaks, backwards-compatible
+
+### Single source of truth
+
+The version lives in **`package.json`** and is mirrored to **`APP_VERSION`** in
+`src/data/initialData.js` (what the UI shows and what the in-app update check
+compares against). These must match. Don't edit them by hand — use the scripts
+below, which update both at once so they can never drift.
+
+### Bumping the version
+
+```bash
+npm run version:patch      # 4.0.38 -> 4.0.39  (bug fixes)
+npm run version:minor      # 4.0.38 -> 4.1.0   (new features)
+npm run version:major      # 4.0.38 -> 5.0.0   (breaking changes)
+npm run version:set 4.2.0  # set an exact version
+```
+
+Each command updates `package.json` and `initialData.js`, then prints the next
+steps. After bumping:
+
+1. Add a matching entry to **`CHANGELOG.md`** (the canonical release record).
+2. Commit — e.g. `git commit -am "chore: release 4.0.39"`.
+3. Optionally tag it — `git tag v4.0.39`.
+4. Push to `main` on **CueMii2**.
+
+### How updates reach users
+
+The About modal's "Check for Updates" reads `package.json`'s `version` from the
+`main` branch of the [CueMii2 repo](https://github.com/joseph-vertido/CueMii2)
+and compares it to the running `APP_VERSION`. Once a bumped version is pushed to
+`main`, other installs will see "update available" and can pull it via
+`update.sh` (macOS/Linux) or `update.bat` (Windows).
+
+> Detailed, machine-friendly release notes live in `CHANGELOG.md`. The list
+> below is retained for legacy history.
+
 ## Version History
+
+- **v4.0.38** - Firebase Link + Versioning System
+  - Added: "Open Firebase Database" link in the Cloud Sync section of the About modal
+  - Added: Versioning system (CHANGELOG.md, bump-version script, npm version scripts)
+  - Changed: Update / distribution URLs now point to the CueMii2 repository
 
 - **v4.0.37** - Move Cloud Sync to About Modal
 - **v4.0.36** - Firebase Cloud Sync
