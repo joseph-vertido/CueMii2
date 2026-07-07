@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- DPUruNet ships as a Windows library. net6.0-windows works with the
+         modern U.are.U SDK; if your DPUruNet.dll is .NET Framework only,
+         retarget to net48 instead. -->
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>CueMiiFingerprintService</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Copy DPUruNet.dll from your U.are.U SDK install into ./libs/.
+         Typical location: C:\Program Files\DigitalPersona\U.are.U SDK\Windows\Lib\...\DPUruNet.dll -->
+    <Reference Include="DPUruNet">
+      <HintPath>libs\DPUruNet.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

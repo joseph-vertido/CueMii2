@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v6.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v6.0": {
+      "CueMiiFingerprintService/1.0.0": {
+        "dependencies": {
+          "DPUruNet": "1.0.0.1"
+        },
+        "runtime": {
+          "CueMiiFingerprintService.dll": {}
+        }
+      },
+      "DPUruNet/1.0.0.1": {
+        "runtime": {
+          "DPUruNet.dll": {
+            "assemblyVersion": "1.0.0.1",
+            "fileVersion": "3.2.0.89"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "CueMiiFingerprintService/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "DPUruNet/1.0.0.1": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

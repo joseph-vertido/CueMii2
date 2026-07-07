@@ -115,31 +115,31 @@ export const useCloudSync = (players, setPlayers, enabled = true) => {
     }
   }, [setPlayers]);
 
-  // Auto-sync on mount if enabled and online
-  useEffect(() => {
-    if (enabled && isOnline && firebaseInitialized) {
-      // Delay initial sync to let app load
-      const timer = setTimeout(() => {
-        performSync();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [enabled]);
+  // Auto-sync at most once every 2 hours while enabled. Manual performSync
+  // (the "Sync Now" button) is unaffected and always syncs immediately.
+  const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
-  // Auto-sync when players change (debounced)
   useEffect(() => {
-    if (!enabled || !isOnline || !firebaseInitialized) return;
-    
-    const timer = setTimeout(() => {
-      // Only sync if there are actual changes (not initial load)
-      if (lastSyncTime) {
-        pendingSyncRef.current = true;
-        performSync();
-      }
-    }, 5000); // Wait 5 seconds after last change
-    
-    return () => clearTimeout(timer);
-  }, [players, enabled, isOnline]);
+    if (!enabled || !firebaseInitialized) return;
+
+    let intervalId;
+    const initialTimer = setTimeout(() => {
+      // On load, only sync if the last sync was more than 2 hours ago.
+      const stale = !lastSyncTime || (Date.now() - lastSyncTime) >= AUTO_SYNC_INTERVAL_MS;
+      if (checkOnlineStatus() && stale) performSync();
+
+      // Then sync on a 2-hour cadence.
+      intervalId = setInterval(() => {
+        if (checkOnlineStatus()) performSync();
+      }, AUTO_SYNC_INTERVAL_MS);
+    }, 2000);
+
+    return () => {
+      clearTimeout(initialTimer);
+      if (intervalId) clearInterval(intervalId);
+    };
+    // lastSyncTime intentionally read once at mount for the staleness check.
+  }, [enabled, performSync]);
 
   // Format last sync time
   const getLastSyncDisplay = () => {

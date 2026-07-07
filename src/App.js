@@ -3,6 +3,8 @@ import { initialPlayers, initialCourts } from './data/initialData';
 import useCurrentTime from './hooks/useCurrentTime';
 import useLocalStorage from './hooks/useLocalStorage';
 import useCloudSync, { SYNC_STATUS } from './hooks/useCloudSync';
+import { syncFingerprintsToCloud, fetchFingerprintsFromCloud, syncPlayersToCloud, fetchPlayersFromCloud } from './utils/firebase';
+import { replaceEnrollments, importEnrollments } from './utils/fingerprintService';
 import {
   Header,
   PlayerDatabaseModal,
@@ -13,7 +15,8 @@ import {
   LicenseEntryModal,
   AboutModal,
   ReportsModal,
-  SettingsModal
+  SettingsModal,
+  FingerprintController
 } from './components';
 import { 
   validateLicense, 
@@ -39,6 +42,8 @@ function App() {
   const [players, setPlayers] = useLocalStorage('baddixx_players', initialPlayers);
   const [poolPlayers, setPoolPlayers] = useLocalStorage('baddixx_pool', []);
   const [notPresentPlayers, setNotPresentPlayers] = useLocalStorage('baddixx_notPresent', []); // Players added but not yet available
+  // Fingerprint enrollments: { [playerId]: string[] } (captured samples/templates)
+  const [fingerprints, setFingerprints] = useLocalStorage('baddixx_fingerprints', {});
   const [matches, setMatches] = useLocalStorage('baddixx_matches', []);
   const [courts, setCourts] = useLocalStorage('baddixx_courts', initialCourts);
   const [nextMatchNumber, setNextMatchNumber] = useLocalStorage('baddixx_nextMatchNumber', 1);
@@ -316,12 +321,46 @@ function App() {
     setPlayers(prev => [...prev, player]);
   };
 
-  const importPlayers = (newPlayers) => {
-    setPlayers(prev => {
-      const existingNames = new Set(prev.map(p => p.name.toLowerCase()));
-      const uniqueNewPlayers = newPlayers.filter(p => !existingNames.has(p.name.toLowerCase()));
-      return [...prev, ...uniqueNewPlayers];
-    });
+  const importPlayers = (newPlayers, newFingerprints = {}) => {
+    // Merge players, deduping by name and preserving imported IDs.
+    const nameToId = new Map(players.map(p => [p.name.trim().toLowerCase(), p.id]));
+    const uniqueNewPlayers = [];
+    for (const np of newPlayers) {
+      const key = np.name.trim().toLowerCase();
+      if (!nameToId.has(key)) {
+        uniqueNewPlayers.push(np);
+        nameToId.set(key, np.id);
+      }
+    }
+    if (uniqueNewPlayers.length > 0) {
+      setPlayers(prev => [...prev, ...uniqueNewPlayers]);
+    }
+
+    // Merge fingerprints, remapping each to the resolved player's id (by name),
+    // so imported prints attach to the right player even if the name already
+    // existed under a different id.
+    const fpToAdd = {};
+    for (const np of newPlayers) {
+      const entry = newFingerprints[np.id] || newFingerprints[String(np.id)];
+      if (!entry || !entry.template) continue;
+      const targetId = nameToId.get(np.name.trim().toLowerCase()) || np.id;
+      fpToAdd[targetId] = {
+        template: entry.template,
+        player: { id: targetId, name: np.name, gender: np.gender, level: np.level }
+      };
+    }
+
+    if (Object.keys(fpToAdd).length > 0) {
+      setFingerprints(prev => {
+        const next = { ...prev, ...fpToAdd };
+        importEnrollments(next); // seed the matching service (merge)
+        if (cloudSyncEnabled && isFirebaseConfigured) {
+          syncFingerprintsToCloud(next).catch(err =>
+            console.warn('Fingerprint cloud sync failed:', err.message));
+        }
+        return next;
+      });
+    }
   };
 
   const editPlayer = (updatedPlayer) => {
@@ -394,6 +433,196 @@ function App() {
       joinedAt: Date.now(),
       playCount: 0
     }]);
+  };
+
+  // Fingerprint check-in: place a player DIRECTLY into the Available pool.
+  // Used by the fingerprint reader when a known finger is scanned.
+  const checkInPlayerById = (rawPlayerId) => {
+    // IDs may arrive as strings (from the fingerprint service); normalize.
+    const numId = Number(rawPlayerId);
+    const playerId = Number.isNaN(numId) ? rawPlayerId : numId;
+
+    // Source the player from Not Present (if staged) or the database.
+    const staged = notPresentPlayers.find(p => p.id === playerId);
+    let base = staged || players.find(p => p.id === playerId);
+
+    // Fallback: the player database was cleared/not synced, but the fingerprint
+    // carries the player's identity — use it and restore the player to the DB.
+    if (!base) {
+      const entry = fingerprints[playerId] || fingerprints[String(playerId)];
+      if (entry && entry.player) {
+        base = entry.player;
+        setPlayers(prev => prev.find(p => p.id === base.id) ? prev : [...prev, base]);
+      }
+    }
+    if (!base) return; // truly unknown player id
+
+    if (staged) {
+      setNotPresentPlayers(prev => prev.filter(p => p.id !== playerId));
+    }
+
+    // Add to the Available pool, deduping atomically against the latest state so
+    // rapid repeat scans can't insert the same player twice.
+    setPoolPlayers(prev => {
+      if (prev.find(p => p.id === playerId)) return prev;
+      return [...prev, {
+        ...base,
+        joinedAt: Date.now(),
+        playCount: base.playCount || 0,
+        // Ensure pairing/tracking fields exist (mirrors addToPool defaults).
+        noviceMatchCount: base.noviceMatchCount || 0,
+        lastNoviceMatchAt: base.lastNoviceMatchAt || 0,
+        lastAdvancedMatchAt: base.lastAdvancedMatchAt || 0,
+        pairedNovices: base.pairedNovices || [],
+        pairedAdvanced: base.pairedAdvanced || [],
+        intermediateNoviceCount: base.intermediateNoviceCount || 0,
+        lastIntermediateNoviceMatchAt: base.lastIntermediateNoviceMatchAt || 0,
+        pairedNovicesAsIntermediate: base.pairedNovicesAsIntermediate || []
+      }];
+    });
+  };
+
+  // Persist a fingerprint enrollment (template) for a player, and back it up
+  // to Firebase when cloud sync is enabled.
+  const handleFingerprintEnroll = (playerId, template) => {
+    if (!template) return;
+    // Store the player's identity WITH the template so the fingerprint stays
+    // resolvable even if the local player database is cleared or this is a
+    // fresh machine. Falls back to a minimal record if not found.
+    const p = players.find(pl => pl.id === playerId);
+    const player = p
+      ? { id: p.id, name: p.name, gender: p.gender, level: p.level }
+      : null;
+    const next = { ...fingerprints, [playerId]: { template, player } };
+    setFingerprints(next);
+
+    // Push to Firebase immediately (outside the state updater so it always runs).
+    if (isFirebaseConfigured && cloudSyncEnabled) {
+      syncFingerprintsToCloud(next)
+        .then(() => console.log('[fingerprint] synced to Firebase:', playerId))
+        .catch(err => console.warn('[fingerprint] Firebase sync FAILED:', err.message));
+    } else {
+      console.log(`[fingerprint] not synced (cloudSyncEnabled=${cloudSyncEnabled}, firebaseConfigured=${isFirebaseConfigured}). Enable Cloud Sync to back up fingerprints.`);
+    }
+  };
+
+  // When cloud sync is on (including the moment it's switched on), pull any
+  // cloud-stored fingerprint templates so this machine can identify players
+  // enrolled elsewhere. Seeding the local service is handled by the
+  // FingerprintController whenever the service is online.
+  useEffect(() => {
+    if (!cloudSyncEnabled || !isFirebaseConfigured) return;
+    fetchFingerprintsFromCloud()
+      .then(cloudMap => {
+        setFingerprints(prev => ({ ...cloudMap, ...prev })); // local wins on conflict
+      })
+      .catch(err => console.warn('Fingerprint cloud fetch failed:', err.message));
+  }, [cloudSyncEnabled, isFirebaseConfigured]);
+
+  // Delete one player's fingerprint from the database (local + service + cloud).
+  const deletePlayerFingerprint = (playerId) => {
+    setFingerprints(prev => {
+      const next = { ...prev };
+      delete next[playerId];
+      delete next[String(playerId)];
+      replaceEnrollments(next); // update the matching service so it stops matching
+      if (cloudSyncEnabled && isFirebaseConfigured) {
+        syncFingerprintsToCloud(next).catch(err =>
+          console.warn('Fingerprint cloud sync failed:', err.message));
+      }
+      return next;
+    });
+  };
+
+  // Reset (clear) ALL fingerprints from the database.
+  const resetAllFingerprints = () => {
+    const empty = {};
+    setFingerprints(empty);
+    replaceEnrollments(empty);
+    if (cloudSyncEnabled && isFirebaseConfigured) {
+      syncFingerprintsToCloud(empty).catch(err =>
+        console.warn('Fingerprint cloud sync failed:', err.message));
+    }
+  };
+
+  // Repair: de-duplicate players by name across BOTH the cloud and local copy,
+  // then authoritatively rewrite the cloud and local list so each player exists
+  // exactly once. Works even when the local list is empty (it pulls the cloud).
+  const removeDuplicatePlayers = async () => {
+    let pool = [...players];
+    if (isFirebaseConfigured && cloudSyncEnabled) {
+      try {
+        const cloud = await fetchPlayersFromCloud();
+        pool = [...players, ...cloud]; // union; dedupe by name below
+      } catch (err) {
+        console.warn('Dedupe cloud fetch failed:', err.message);
+      }
+    }
+
+    const seen = new Set();
+    const deduped = [];
+    for (const p of pool) {
+      const key = (p.name || '').trim().toLowerCase();
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      deduped.push(p);
+    }
+    const removed = pool.length - deduped.length;
+
+    setPlayers(deduped);
+    if (isFirebaseConfigured && cloudSyncEnabled) {
+      try {
+        await syncPlayersToCloud(deduped); // cloud = deduped set (extras deleted)
+      } catch (err) {
+        console.warn('Dedupe cloud push failed:', err.message);
+      }
+    }
+    return removed;
+  };
+
+  // Reflect the fingerprint service's actual enrollments (enrollments.json) in
+  // the app so the "has fingerprint" badge matches reality. Adds any templates
+  // the app didn't know about, attaching player info from the database if found.
+  const handleServiceEnrollments = (serviceMap) => {
+    if (!serviceMap || Object.keys(serviceMap).length === 0) return;
+    setFingerprints(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [id, template] of Object.entries(serviceMap)) {
+        if (!template) continue;
+        const key = next[id] ? id : (next[Number(id)] ? Number(id) : id);
+        const existing = next[key];
+        if (existing) {
+          if (!existing.template) { next[key] = { ...existing, template }; changed = true; }
+        } else {
+          const pl = players.find(p => String(p.id) === String(id));
+          next[id] = {
+            template,
+            player: pl ? { id: pl.id, name: pl.name, gender: pl.gender, level: pl.level } : null
+          };
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  };
+
+  // Manual "Sync Now": syncs players (performSync) AND the fingerprint database
+  // to Firebase. Fingerprints are merged both ways (union) so no machine's
+  // templates are lost, then the merged set is pushed and stored locally.
+  const handleManualSync = async () => {
+    const result = await performSync();
+    if (isFirebaseConfigured) {
+      try {
+        const cloudMap = await fetchFingerprintsFromCloud();
+        const merged = { ...cloudMap, ...fingerprints }; // union; local wins on conflict
+        setFingerprints(merged);
+        await syncFingerprintsToCloud(merged);
+      } catch (err) {
+        console.warn('Fingerprint manual sync failed:', err.message);
+      }
+    }
+    return result;
   };
 
   // Move player from Available back to Not Present (with warning)
@@ -2519,6 +2748,11 @@ function App() {
         isDarkMode={isDarkMode}
         licenseInfo={licenseInfo}
         totalPlayerCount={players.length}
+        fingerprintIds={Object.keys(fingerprints).map(id => Number(id))}
+        fingerprints={fingerprints}
+        onDeleteFingerprint={deletePlayerFingerprint}
+        onResetAllFingerprints={resetAllFingerprints}
+        onRemoveDuplicates={removeDuplicatePlayers}
       />
 
       {/* Match History Modal */}
@@ -2544,7 +2778,7 @@ function App() {
         lastSyncDisplay={lastSyncDisplay}
         syncError={syncError}
         isOnline={isOnline}
-        performSync={performSync}
+        performSync={handleManualSync}
         isFirebaseConfigured={isFirebaseConfigured}
       />
 
@@ -2565,6 +2799,20 @@ function App() {
         isDarkMode={isDarkMode}
         warningSettings={warningSettings}
         onUpdateSettings={setWarningSettings}
+      />
+
+      {/* Fingerprint reader: listens for scans, checks in known players,
+          and opens the assign flow for unknown fingers. */}
+      <FingerprintController
+        players={players}
+        enrollments={fingerprints}
+        enrolledPlayerIds={Object.keys(fingerprints).map(id => Number(id))}
+        getPlayerById={(id) => players.find(p => p.id === id) || ((fingerprints[id] || fingerprints[String(id)] || {}).player) || null}
+        onCheckIn={checkInPlayerById}
+        onEnroll={handleFingerprintEnroll}
+        onServiceEnrollments={handleServiceEnrollments}
+        enabled={true}
+        isDarkMode={isDarkMode}
       />
     </div>
   );

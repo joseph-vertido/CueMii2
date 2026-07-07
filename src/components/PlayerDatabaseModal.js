@@ -21,7 +21,12 @@ const PlayerDatabaseModal = ({
   onImportPlayers,
   isDarkMode = true,
   licenseInfo = null,
-  totalPlayerCount = 0
+  totalPlayerCount = 0,
+  fingerprintIds = [],
+  fingerprints = {},
+  onDeleteFingerprint = () => {},
+  onResetAllFingerprints = () => {},
+  onRemoveDuplicates = async () => 0
 }) => {
   const [newPlayer, setNewPlayer] = useState({ name: '', gender: 'male', level: 'Intermediate' });
   const [editingPlayer, setEditingPlayer] = useState(null);
@@ -36,6 +41,11 @@ const PlayerDatabaseModal = ({
   
   const playerListRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  // Which players have a fingerprint enrolled.
+  const fingerprintSet = new Set(fingerprintIds);
+  const hasFingerprint = (id) => fingerprintSet.has(id);
+  const isInPool = (playerId) => poolPlayers.some(p => p.id === playerId) || notPresentPlayers.some(p => p.id === playerId);
 
   // Reset showAddSection and focus search when modal opens
   useEffect(() => {
@@ -96,9 +106,9 @@ const PlayerDatabaseModal = ({
   // Level order for sorting
   const levelOrder = { 'Expert': 0, 'Advanced': 1, 'Intermediate': 2, 'Novice': 3 };
 
-  // Export players to CSV
+  // Export players to CSV (with id + fingerprint template)
   const handleExportCSV = () => {
-    exportPlayersToCSV(players);
+    exportPlayersToCSV(players, fingerprints);
   };
 
   // Import players from CSV
@@ -112,7 +122,7 @@ const PlayerDatabaseModal = ({
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const { players: importedPlayers, errors } = parsePlayersCSV(e.target.result);
+        const { players: importedPlayers, fingerprints: importedFingerprints, errors } = parsePlayersCSV(e.target.result);
 
         if (errors.length > 0 && importedPlayers.length === 0) {
           setImportError(errors[0]);
@@ -135,8 +145,18 @@ const PlayerDatabaseModal = ({
             limitMessage = ` (${importedPlayers.length - availableSlots} player(s) were not imported due to license limit of ${maxPlayers})`;
           }
           
-          onImportPlayers(playersToImport);
-          setImportSuccess(`Successfully imported ${playersToImport.length} player(s)${limitMessage}`);
+          // Only import fingerprints for players that actually got imported.
+          const idsToImport = new Set(playersToImport.map(p => p.id));
+          const fpToImport = {};
+          for (const [id, entry] of Object.entries(importedFingerprints || {})) {
+            if (idsToImport.has(Number(id)) || idsToImport.has(id)) {
+              fpToImport[id] = entry;
+            }
+          }
+
+          onImportPlayers(playersToImport, fpToImport);
+          const fpCount = Object.keys(fpToImport).length;
+          setImportSuccess(`Successfully imported ${playersToImport.length} player(s)${fpCount ? ` and ${fpCount} fingerprint(s)` : ''}${limitMessage}`);
           if (errors.length > 0) {
             setImportError(`${errors.length} row(s) skipped due to errors`);
           }
@@ -183,6 +203,10 @@ const PlayerDatabaseModal = ({
         comparison = a.gender.localeCompare(b.gender);
       } else if (sortBy === 'level') {
         comparison = levelOrder[a.level] - levelOrder[b.level];
+      } else if (sortBy === 'status') {
+        comparison = (isInPool(b.id) ? 1 : 0) - (isInPool(a.id) ? 1 : 0);
+      } else if (sortBy === 'fingerprint') {
+        comparison = (hasFingerprint(b.id) ? 1 : 0) - (hasFingerprint(a.id) ? 1 : 0);
       }
       
       // Use ID as tiebreaker for stable sorting
@@ -247,11 +271,9 @@ const PlayerDatabaseModal = ({
     }
   };
 
-  const isInPool = (playerId) => poolPlayers.some(p => p.id === playerId) || notPresentPlayers.some(p => p.id === playerId);
-
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl w-[800px] h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border border-cyan-500/20">
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl w-[92vw] max-w-[1000px] h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border border-cyan-500/20">
         {/* Header */}
         <div className="bg-gradient-to-r from-cyan-600 to-teal-600 px-4 py-2.5 flex justify-between items-center flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -286,6 +308,39 @@ const PlayerDatabaseModal = ({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
                 Clear Pool ({poolPlayers.length + notPresentPlayers.length})
+              </button>
+            )}
+            {/* Remove Duplicate Players (repair) */}
+            <button
+              onClick={async () => {
+                if (window.confirm('Clean up duplicate players by name (across the cloud and this device) and rewrite the cloud to match?')) {
+                  const removed = await onRemoveDuplicates();
+                  window.alert(removed > 0 ? `Cleaned up ${removed} duplicate entr(ies).` : 'No duplicates found.');
+                }
+              }}
+              className="bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 text-xs border border-amber-500/30"
+              title="De-duplicate players by name and fix the cloud copy"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              Remove Duplicates
+            </button>
+            {/* Reset All Fingerprints */}
+            {fingerprintIds.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Reset ALL fingerprints? This removes ${fingerprintIds.length} enrolled fingerprint(s) from the database and cannot be undone.`)) {
+                    onResetAllFingerprints();
+                  }
+                }}
+                className="bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 text-xs border border-cyan-500/30"
+                title="Remove every enrolled fingerprint"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11a5 5 0 0110 0c0 3-1 5-1 7M5 13a7 7 0 0113-3.5" />
+                </svg>
+                Reset FP ({fingerprintIds.length})
               </button>
             )}
             {/* Export Button */}
@@ -471,7 +526,7 @@ const PlayerDatabaseModal = ({
           </div>
 
           {/* A-Z Letter Filter */}
-          <div className="mb-4 flex gap-0.5">
+          <div className="mb-4 flex gap-0.5 justify-center flex-wrap">
             <button
               onClick={() => setLetterFilter('')}
               className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
@@ -509,17 +564,18 @@ const PlayerDatabaseModal = ({
             <table className="w-full table-fixed">
               <colgroup>
                 <col className="w-[30%]" />
+                <col className="w-[10%]" />
                 <col className="w-[12%]" />
-                <col className="w-[15%]" />
-                <col className="w-[13%]" />
-                <col className="w-[30%]" />
+                <col className="w-[12%]" />
+                <col className="w-[14%]" />
+                <col className="w-[22%]" />
               </colgroup>
               <thead className="sticky top-0 bg-slate-800">
                 <tr className="text-left text-slate-400 text-sm uppercase tracking-wider">
                   <th className="py-3 px-2 align-middle">
                     <button 
                       onClick={() => handleSort('name')}
-                      className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
+                      className="flex items-center gap-1 uppercase hover:text-cyan-400 transition-colors"
                     >
                       Name <SortIcon field="name" />
                     </button>
@@ -527,7 +583,7 @@ const PlayerDatabaseModal = ({
                   <th className="py-3 px-2 align-middle">
                     <button 
                       onClick={() => handleSort('gender')}
-                      className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
+                      className="flex items-center gap-1 uppercase hover:text-cyan-400 transition-colors"
                     >
                       Gender <SortIcon field="gender" />
                     </button>
@@ -535,12 +591,27 @@ const PlayerDatabaseModal = ({
                   <th className="py-3 px-2 align-middle">
                     <button 
                       onClick={() => handleSort('level')}
-                      className="flex items-center gap-1 hover:text-cyan-400 transition-colors"
+                      className="flex items-center gap-1 uppercase hover:text-cyan-400 transition-colors"
                     >
                       Level <SortIcon field="level" />
                     </button>
                   </th>
-                  <th className="py-3 px-2 align-middle">Status</th>
+                  <th className="py-3 px-2 align-middle">
+                    <button
+                      onClick={() => handleSort('status')}
+                      className="flex items-center gap-1 uppercase hover:text-cyan-400 transition-colors"
+                    >
+                      Status <SortIcon field="status" />
+                    </button>
+                  </th>
+                  <th className="py-3 px-2 align-middle">
+                    <button
+                      onClick={() => handleSort('fingerprint')}
+                      className="flex items-center gap-1 uppercase hover:text-cyan-400 transition-colors"
+                    >
+                      Fingerprint <SortIcon field="fingerprint" />
+                    </button>
+                  </th>
                   <th className="py-3 px-2 align-middle text-right">Actions</th>
                 </tr>
               </thead>
@@ -592,6 +663,11 @@ const PlayerDatabaseModal = ({
                             {isInPool(player.id) ? 'In Pool' : 'Not in Pool'}
                           </span>
                         </td>
+                        <td className="py-3 px-2">
+                          <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${hasFingerprint(player.id) ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-600/40 text-slate-500'}`}>
+                            {hasFingerprint(player.id) ? 'Stored' : 'None'}
+                          </span>
+                        </td>
                         <td className="py-3 px-2 text-right whitespace-nowrap">
                           <button onClick={handleSaveEdit} className="text-green-400 hover:text-green-300 mr-2">Save</button>
                           <button onClick={() => setEditingPlayer(null)} className="text-slate-400 hover:text-slate-300">Cancel</button>
@@ -616,6 +692,30 @@ const PlayerDatabaseModal = ({
                           <span className={`text-xs px-2 py-1 rounded-full ${isInPool(player.id) ? 'bg-green-500/20 text-green-400' : 'bg-slate-600/50 text-slate-400'}`}>
                             {isInPool(player.id) ? 'In Pool' : 'Not in Pool'}
                           </span>
+                        </td>
+                        <td className="py-3 px-2">
+                          {hasFingerprint(player.id) ? (
+                            <span className="inline-flex items-center gap-1">
+                              <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-300 whitespace-nowrap" title="Fingerprint enrolled">
+                                Stored
+                              </span>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Delete ${player.name}'s fingerprint from the database?`)) {
+                                    onDeleteFingerprint(player.id);
+                                  }
+                                }}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-500/10 text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full transition-colors"
+                                title="Delete this fingerprint"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-1 rounded-full bg-slate-600/40 text-slate-500 whitespace-nowrap" title="No fingerprint enrolled">
+                              None
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-2 text-right space-x-2">
                           {!isInPool(player.id) ? (

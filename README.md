@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 4.0.38**
+**Version 4.3.5**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -161,6 +161,53 @@ All application data is automatically saved to your browser's localStorage:
 
 Data persists across browser refreshes and sessions. Use the **Reset** button in the header to clear all saved data and restore defaults.
 
+## Fingerprint Check-In (DigitalPersona U.are.U 4500)
+
+Players can check in by fingerprint. This uses a **direct-capture** design: a
+small local service owns the reader and does capture + matching, and the app
+polls it. There is **no browser WebSDK agent** — no certificates, no handshake,
+none of that fragility.
+
+### Requirements
+
+1. **.NET SDK 6+** and the **DigitalPersona U.are.U SDK** (provides `DPUruNet.dll`).
+2. The **DigitalPersona 4500 WBF device driver** so Windows sees the reader.
+3. Copy `DPUruNet.dll` into `fingerprint-service/libs/` (from
+   `C:\Program Files\DigitalPersona\U.are.U SDK\Windows\Lib\.NET\`).
+
+On Windows, `setup-fingerprint.bat` runs the checks, `npm install`, and builds
+the service (once `DPUruNet.dll` is in place).
+
+### Running
+
+Two terminals:
+
+```bash
+# 1) the capture + matching service
+cd fingerprint-service
+dotnet run          # -> http://localhost:9001/
+
+# 2) the app
+npm start           # -> http://localhost:3000
+```
+
+The app polls `http://localhost:9001` (see `SERVICE_BASE_URL` in
+`src/utils/fingerprintService.js`). The status pill (bottom-left) shows the
+reader state.
+
+### Flow
+
+- **Known finger** -> the player is checked into the Available pool.
+- **Unknown finger** -> an assign dialog opens; pick a player and scan a few
+  times. The service builds the template and stores it (and syncs to Firebase
+  if cloud sync is on). Enrollments live under `baddixx_fingerprints`.
+
+### Service endpoints
+
+`GET /health`, `GET /events?after=<seq>`, `POST /enroll/start {playerId}`,
+`POST /enroll/cancel`, `POST /import {enrollments}`.
+
+
 ## Versioning & Releases
 
 The app follows [Semantic Versioning](https://semver.org/) — `MAJOR.MINOR.PATCH`:
@@ -205,6 +252,35 @@ and compares it to the running `APP_VERSION`. Once a bumped version is pushed to
 > below is retained for legacy history.
 
 ## Version History
+
+- **v4.3.5** - Sortable Status/Fingerprint columns; uppercase Name/Gender/Level headers
+
+- **v4.3.4** - Fingerprint pill cleanup (no check mark, inline X delete) + narrower Actions column
+
+- **v4.3.3** - UI: narrower player database, centered A-Z index, removed level letter from Courts
+
+- **v4.3.2** - Manage Players fingerprint badge reflects the service's actual enrollments
+
+- **v4.3.1** - Reliable fingerprint sync to Firebase on enrolment (+ diagnostics)
+
+- **v4.3.0** - CSV export/import includes ID + fingerprint template; Delete FP button moved
+
+- **v4.2.2** - Sync collapses players by name (fixes duplicate players on sync)
+
+- **v4.2.1** - Cloud-aware "Remove Duplicates" (cleans doubled Firebase rosters)
+
+- **v4.2.0** - Direct-capture fingerprints, fingerprint management & cloud sync improvements
+  - Fingerprint check-in re-architected to direct capture (no browser WebSDK/agent)
+  - Cloud sync auto-syncs at most once every 2 hours; seed roster removed (Firebase is source of truth)
+  - Manage Players: Status/Fingerprint columns, delete/reset fingerprints, remove-duplicates repair
+  - Self-describing fingerprints survive cache clears; fingerprint templates sync to Firebase
+  - Fixed duplicate check-ins and reload replay of old scans
+
+- **v4.1.0** - Fingerprint Check-In (DigitalPersona U.are.U 4500)
+  - Added: Listens for fingerprint scans; known finger checks a player into the Available pool
+  - Added: Unknown finger opens an assign/enroll dialog
+  - Added: Pluggable matching seam (DP Authentication Server or local U.are.U service)
+  - Note: Requires HID Authentication Device Client + WebSdk (see public/index.html)
 
 - **v4.0.38** - Firebase Link + Versioning System
   - Added: "Open Firebase Database" link in the Cloud Sync section of the About modal

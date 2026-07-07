@@ -280,7 +280,7 @@ const CourtsPanel = ({
               {/* Court Content */}
               {court.match ? (
                 <div className="px-2 pt-1.5 pb-2">
-                  {/* Players - 2x2 with level - no color backgrounds */}
+                  {/* Players - 2x2 */}
                   <div className="grid grid-cols-2 gap-1 mb-2">
                     {court.match.players.map((player) => (
                       <div
@@ -294,12 +294,6 @@ const CourtsPanel = ({
                             ? (isDarkMode ? 'text-blue-300' : 'text-blue-700') 
                             : (isDarkMode ? 'text-pink-300' : 'text-pink-700')
                         }`}>{formatName(player)}</span>
-                        <span className={`text-xs font-bold ml-1 ${
-                          player.level === 'Expert' ? (isDarkMode ? 'text-purple-300' : 'text-purple-600') :
-                          player.level === 'Advanced' ? (isDarkMode ? 'text-orange-300' : 'text-orange-600') :
-                          player.level === 'Intermediate' ? (isDarkMode ? 'text-cyan-300' : 'text-cyan-600') :
-                          (isDarkMode ? 'text-green-300' : 'text-green-600')
-                        }`}>{player.level[0]}</span>
                       </div>
                     ))}
                   </div>

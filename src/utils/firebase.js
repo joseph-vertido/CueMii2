@@ -108,8 +108,8 @@ export const fetchPlayersFromCloud = async () => {
   const playersRef = collection(db, 'players');
   const q = query(playersRef, orderBy('name'));
   const snapshot = await getDocs(q);
-  
-  return snapshot.docs.map(doc => {
+
+  const result = snapshot.docs.map(doc => {
     const data = doc.data();
     // Convert Firestore timestamps to regular dates/numbers
     return {
@@ -119,6 +119,10 @@ export const fetchPlayersFromCloud = async () => {
       syncedAt: data.syncedAt?.toMillis?.() || data.syncedAt
     };
   });
+
+  const uniqueNames = new Set(result.map(p => (p.name || '').trim().toLowerCase())).size;
+  console.log(`[sync] fetched ${result.length} cloud docs, ${uniqueNames} unique names`);
+  return result;
 };
 
 /**
@@ -158,14 +162,35 @@ export const twoWaySync = async (localPlayers, setPlayers) => {
     }
   }
   
+  // Collapse by name. The app treats player names as unique, so if the same
+  // person appears under more than one ID (across versions/devices), keep a
+  // single entry (the most recently updated). This prevents the "two copies of
+  // each player" duplication regardless of how it arises, and heals the cloud
+  // on push.
+  const byName = new Map();
+  const unnamed = [];
+  for (const p of mergedPlayers) {
+    const key = (p.name || '').trim().toLowerCase();
+    if (!key) { unnamed.push(p); continue; }
+    const existing = byName.get(key);
+    if (!existing || (p.updatedAt || 0) > (existing.updatedAt || 0)) {
+      byName.set(key, p);
+    }
+  }
+  const finalPlayers = [...byName.values(), ...unnamed];
+
+  if (finalPlayers.length !== mergedPlayers.length) {
+    console.warn(`[sync] collapsed ${mergedPlayers.length} -> ${finalPlayers.length} players by name (local=${localPlayers.length}, cloud=${cloudPlayers.length})`);
+  }
+
   // Update local state
-  setPlayers(mergedPlayers);
-  
-  // Push merged data back to cloud
-  await syncPlayersToCloud(mergedPlayers);
-  
+  setPlayers(finalPlayers);
+
+  // Push cleaned data back to cloud (removes any extra cloud copies)
+  await syncPlayersToCloud(finalPlayers);
+
   return {
-    totalPlayers: mergedPlayers.length,
+    totalPlayers: finalPlayers.length,
     fromCloud: cloudPlayers.length,
     fromLocal: localPlayers.length
   };
@@ -176,4 +201,71 @@ export const twoWaySync = async (localPlayers, setPlayers) => {
  */
 export const checkOnlineStatus = () => {
   return navigator.onLine;
+};
+
+/**
+ * ---------------------------------------------------------------------------
+ * Fingerprint templates (biometric enrollment data)
+ * ---------------------------------------------------------------------------
+ * Stores one enrollment template (FMD, base64) per player in the `fingerprints`
+ * collection: doc id = playerId, { template, updatedAt }.
+ *
+ * ⚠️ SECURITY / PRIVACY: fingerprint templates are sensitive biometric data.
+ * Before enabling this, lock down Firestore rules so the `fingerprints`
+ * collection is NOT world-readable (require auth), and make sure you have
+ * consent to store biometric data (GDPR special-category / BIPA etc.).
+ * Templates here are minutiae data, not images, but are still personal data.
+ */
+
+// map: { [playerId]: templateBase64 }
+export const syncFingerprintsToCloud = async (fingerprintsMap) => {
+  if (!db || !isInitialized) {
+    throw new Error('Firebase not initialized');
+  }
+
+  const batch = writeBatch(db);
+  const ref = collection(db, 'fingerprints');
+
+  const cloudSnapshot = await getDocs(ref);
+  const cloudIds = new Set(cloudSnapshot.docs.map((d) => d.id));
+  const localIds = new Set(Object.keys(fingerprintsMap));
+
+  // Remove enrollments deleted locally
+  for (const cloudId of cloudIds) {
+    if (!localIds.has(cloudId)) {
+      batch.delete(doc(db, 'fingerprints', cloudId));
+    }
+  }
+
+  // Upsert local enrollments. Each entry is { template, player }.
+  for (const [playerId, entry] of Object.entries(fingerprintsMap)) {
+    if (!entry) continue;
+    const template = typeof entry === 'string' ? entry : entry.template;
+    const player = typeof entry === 'string' ? null : (entry.player || null);
+    if (!template) continue;
+    batch.set(doc(db, 'fingerprints', playerId.toString()), {
+      template,
+      player,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  await batch.commit();
+  return Object.keys(fingerprintsMap).length;
+};
+
+// returns { [playerId]: templateBase64 }
+export const fetchFingerprintsFromCloud = async () => {
+  if (!db || !isInitialized) {
+    throw new Error('Firebase not initialized');
+  }
+  const snapshot = await getDocs(collection(db, 'fingerprints'));
+  const map = {};
+  snapshot.docs.forEach((d) => {
+    const data = d.data();
+    if (data && data.template) {
+      map[d.id] = { template: data.template, player: data.player || null };
+    }
+  });
+  return map;
 };

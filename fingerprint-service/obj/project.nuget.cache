@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "pKDQ3W5t24c=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\jrver\\Documents\\Baddixx\\CueMii2\\fingerprint-service\\FingerprintService.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\jrver\\.nuget\\packages\\microsoft.netcore.app.ref\\6.0.36\\microsoft.netcore.app.ref.6.0.36.nupkg.sha512",
+    "C:\\Users\\jrver\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\6.0.36\\microsoft.windowsdesktop.app.ref.6.0.36.nupkg.sha512",
+    "C:\\Users\\jrver\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\6.0.36\\microsoft.aspnetcore.app.ref.6.0.36.nupkg.sha512",
+    "C:\\Users\\jrver\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\6.0.36\\microsoft.netcore.app.host.win-x64.6.0.36.nupkg.sha512"
+  ],
+  "logs": []
+}
