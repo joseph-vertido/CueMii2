@@ -14,6 +14,22 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.14.3] - 2026-07-17
+
+### Fixed
+- **update.bat now updates the app properly.** It had no working-directory
+  handling, so `xcopy ... "."` wrote to whatever directory the console happened
+  to be in — running it as administrator or from a shortcut copied the new files
+  somewhere else entirely, leaving the app untouched. It now always updates the
+  folder the script lives in (the same `pushd "%~dp0"` the other scripts use).
+
+### Changed
+- update.bat is more informative and safer: it refuses to run outside the app
+  folder, prints the version before and after so you can see whether anything
+  changed, warns if CueMii is still running (locked files), verifies the
+  download isn't empty, falls back to the `master` branch if `main` is missing,
+  and runs `npm install` automatically at the end.
+
 ## [4.14.2] - 2026-07-17
 
 ### Changed
