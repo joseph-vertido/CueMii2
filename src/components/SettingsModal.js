@@ -40,7 +40,7 @@ const SettingsModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className={`w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden ${
+      <div className={`neon-panel w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden ${
         isDarkMode ? 'bg-slate-900' : 'bg-white'
       }`}>
         {/* Header */}
@@ -201,7 +201,7 @@ const SettingsModal = ({
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white shadow-md shadow-pink-500/25 transition-all"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-cyan-700 hover:bg-cyan-600 text-white transition-all"
             >
               Save Settings
             </button>

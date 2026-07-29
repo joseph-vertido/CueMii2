@@ -10,6 +10,7 @@
  */
 
 const LICENSE_STORAGE_KEY = 'baddixx_license';
+const DAYPASS_START_KEY = 'baddixx_daypass_start';
 
 /**
  * Decode a license key
@@ -47,13 +48,24 @@ export const validateLicense = (licenseKey) => {
 
   const trimmedKey = licenseKey.trim();
   
-  // Override: Special day pass license
+  // Override: Special day pass license — expires at the end of the day it was
+  // first activated (so it correctly lapses the following day). We persist the
+  // activation day so it isn't recomputed as "today" on every app load.
   if (trimmedKey === '0067006700') {
-    const today = new Date();
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    let startMs = null;
+    try {
+      const stored = localStorage.getItem(DAYPASS_START_KEY);
+      if (stored) startMs = parseInt(stored, 10);
+    } catch (e) { /* ignore */ }
+    if (!startMs || Number.isNaN(startMs)) {
+      startMs = Date.now();
+      try { localStorage.setItem(DAYPASS_START_KEY, String(startMs)); } catch (e) { /* ignore */ }
+    }
+    const start = new Date(startMs);
+    const endOfActivationDay = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 59, 59, 999);
     return {
       isValid: true,
-      expirationDate: endOfDay,
+      expirationDate: endOfActivationDay,
       maxPlayers: 500,
       rawKey: trimmedKey
     };
@@ -162,6 +174,7 @@ export const loadLicense = () => {
 export const clearLicense = () => {
   try {
     localStorage.removeItem(LICENSE_STORAGE_KEY);
+    localStorage.removeItem(DAYPASS_START_KEY);
     return true;
   } catch (e) {
     console.error('Failed to clear license:', e);
@@ -188,7 +201,7 @@ export const formatExpirationDate = (date) => {
  * @param {Date} expirationDate - The expiration date
  * @returns {object} - { text, colorClass }
  */
-export const getLicenseStatus = (expirationDate) => {
+export const getLicenseStatus = (expirationDate, isDarkMode = true) => {
   const daysLeft = getDaysUntilExpiration(expirationDate);
   
   if (daysLeft < 0) {
@@ -198,12 +211,12 @@ export const getLicenseStatus = (expirationDate) => {
     return { text: 'EXPIRES TODAY', colorClass: 'text-red-500' };
   }
   if (daysLeft <= 7) {
-    return { text: `EXPIRING SOON (${daysLeft} days)`, colorClass: 'text-red-400' };
+    return { text: `EXPIRING SOON (${daysLeft} days)`, colorClass: isDarkMode ? 'text-red-400' : 'text-red-600' };
   }
   if (daysLeft <= 30) {
-    return { text: `${daysLeft} days remaining`, colorClass: 'text-amber-400' };
+    return { text: `${daysLeft} days remaining`, colorClass: isDarkMode ? 'text-amber-400' : 'text-amber-600' };
   }
-  return { text: 'ACTIVE', colorClass: 'text-emerald-400' };
+  return { text: 'ACTIVE', colorClass: isDarkMode ? 'text-emerald-400' : 'text-emerald-700' };
 };
 
 export default {

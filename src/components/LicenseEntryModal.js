@@ -38,16 +38,14 @@ const LicenseEntryModal = ({ onLicenseValid, isExpired = false }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-2xl border border-cyan-500/30 w-full max-w-md shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-slate-950 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 rounded-2xl border border-slate-700/60 w-full max-w-md shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-cyan-600/20 to-blue-600/20 border-b border-slate-700 px-6 py-5">
+        <div className="bg-slate-800/60 border-b border-slate-700 px-6 py-5">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-3xl">🏸</span>
-            </div>
+            <img src="/banner.png" alt="BADDIXX" className="h-10 w-auto" />
             <div>
-              <h1 className="text-2xl font-bold text-white">BADDIXX CueMii</h1>
+              <h1 className="text-2xl font-bold text-white">CueMii</h1>
               <p className="text-slate-400 text-sm">Version {APP_VERSION}</p>
             </div>
           </div>
@@ -100,7 +98,7 @@ const LicenseEntryModal = ({ onLicenseValid, isExpired = false }) => {
             <button
               type="submit"
               disabled={!licenseKey.trim() || isValidating}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed px-4 py-3 rounded-lg font-semibold text-white transition-all shadow-lg shadow-cyan-500/25"
+              className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-600 disabled:cursor-not-allowed px-4 py-3 rounded-lg font-semibold text-white transition-all"
             >
               {isValidating ? 'Validating...' : 'Activate License'}
             </button>
@@ -110,7 +108,7 @@ const LicenseEntryModal = ({ onLicenseValid, isExpired = false }) => {
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-700 text-center">
           <p className="text-xs text-slate-500">
-            © 2025 BADDIXX CueMii App. All rights reserved.
+            2026 BADDIXX CueMii App. All rights reserved.
           </p>
         </div>
       </div>

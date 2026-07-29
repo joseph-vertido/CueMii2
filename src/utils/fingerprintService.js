@@ -40,6 +40,9 @@ export const startEnroll = (playerId) => post('/enroll/start', { playerId });
 
 export const cancelEnroll = () => post('/enroll/cancel');
 
+// Force the service to drop and re-acquire the reader (manual reconnect).
+export const reconnectReader = () => post('/reconnect');
+
 /**
  * Seed the service with existing templates (e.g. pulled from Firebase).
  * map: { [playerId]: templateBase64 }  OR  { [playerId]: { template, player } }

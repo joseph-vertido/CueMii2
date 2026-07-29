@@ -140,7 +140,7 @@ const AboutModal = ({
   if (!isOpen) return null;
 
   const { expirationDate, maxPlayers, rawKey } = licenseInfo || {};
-  const status = getLicenseStatus(expirationDate);
+  const status = getLicenseStatus(expirationDate, isDarkMode);
   const daysLeft = getDaysUntilExpiration(expirationDate);
   const remainingSlots = maxPlayers ? Math.max(0, maxPlayers - playerDatabaseCount) : 0;
 
@@ -182,20 +182,18 @@ const AboutModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`rounded-2xl border w-full max-w-2xl shadow-2xl ${
+      <div className={`neon-panel rounded-2xl border w-full max-w-xl shadow-2xl ${
         isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
       }`}>
         {/* Header */}
-        <div className={`bg-gradient-to-r from-cyan-600/20 to-blue-600/20 border-b px-6 py-4 flex items-center justify-between rounded-t-2xl ${
-          isDarkMode ? 'border-slate-700' : 'border-slate-200'
+        <div className={`border-b px-6 py-4 flex items-center justify-between rounded-t-2xl ${
+          isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
         }`}>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-2xl">🏸</span>
-            </div>
+            <img src="/banner.png" alt="BADDIXX" className="h-9 w-auto" />
             <div>
               <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                BADDIXX CueMii
+                CueMii
               </h2>
               <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 Version {APP_VERSION}
@@ -216,10 +214,7 @@ const AboutModal = ({
 
         {/* Content - Two Column Layout */}
         <div className="p-6">
-          <div className="grid grid-cols-2 gap-4">
-            {/* Left Column - License & Creator */}
-            <div className="space-y-4">
-          {/* License Status Card */}
+          {/* License Information - full width across the top */}
           <div className={`rounded-xl border p-4 ${
             isDarkMode 
               ? daysLeft < 0 ? 'bg-red-900/20 border-red-500/50' : 'bg-slate-800/50 border-slate-700' 
@@ -314,7 +309,7 @@ const AboutModal = ({
                   <div className="flex justify-between">
                     <span className={isDarkMode ? 'text-slate-400' : 'text-slate-600'}>Days Remaining:</span>
                     <span className={`font-semibold ${
-                      daysLeft <= 7 ? 'text-red-400' : daysLeft <= 30 ? 'text-amber-400' : 'text-emerald-400'
+                      daysLeft <= 7 ? (isDarkMode ? 'text-red-400' : 'text-red-600') : daysLeft <= 30 ? (isDarkMode ? 'text-amber-400' : 'text-amber-600') : (isDarkMode ? 'text-emerald-400' : 'text-emerald-700')
                     }`}>
                       {daysLeft}
                     </span>
@@ -324,6 +319,9 @@ const AboutModal = ({
             )}
           </div>
 
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            {/* Left Column - License & Creator */}
+            <div className="space-y-4">
           {/* Player Database Card */}
           <div className={`rounded-xl border p-4 ${
             isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'
@@ -351,10 +349,10 @@ const AboutModal = ({
                 <span className={isDarkMode ? 'text-slate-400' : 'text-slate-600'}>Remaining Slots:</span>
                 <span className={`font-semibold ${
                   remainingSlots === 0 
-                    ? 'text-red-400' 
+                    ? (isDarkMode ? 'text-red-400' : 'text-red-600')
                     : remainingSlots <= 10 
-                      ? 'text-amber-400' 
-                      : 'text-emerald-400'
+                      ? (isDarkMode ? 'text-amber-400' : 'text-amber-600')
+                      : (isDarkMode ? 'text-emerald-400' : 'text-emerald-700')
                 }`}>
                   {remainingSlots}
                 </span>
@@ -435,7 +433,7 @@ const AboutModal = ({
                 </span>
               )}
               {updateStatus === 'upToDate' && (
-                <span className="text-cyan-400">✓ Up to date</span>
+                <span className={isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}>✓ Up to date</span>
               )}
               {updateStatus === 'error' && (
                 <span className="text-red-400">Unable to check for updates</span>
@@ -542,7 +540,7 @@ const AboutModal = ({
                   ? isDarkMode 
                     ? 'bg-slate-700 text-slate-500 cursor-not-allowed' 
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-md shadow-cyan-500/25'
+                  : 'bg-cyan-700 hover:bg-cyan-600 text-white'
               }`}
             >
               {isSyncing ? (
@@ -598,7 +596,7 @@ const AboutModal = ({
           isDarkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
           <p className={`text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-            © 2025 BADDIXX CueMii App. All rights reserved.
+            2026 BADDIXX CueMii App. All rights reserved.
           </p>
         </div>
       </div>

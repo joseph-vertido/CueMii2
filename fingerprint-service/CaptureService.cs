@@ -41,6 +41,7 @@ namespace CueMiiFingerprintService
 
         private Thread _thread;
         private volatile bool _running;
+        private volatile bool _reconnectRequested;
         private Reader _reader;
         private int _resolution = 500;
 
@@ -73,6 +74,12 @@ namespace CueMiiFingerprintService
             // The capture loop uses a finite timeout, so clearing _running lets
             // it exit within one capture interval.
             _running = false;
+        }
+
+        // Force the capture loop to drop and re-acquire the reader (manual reconnect).
+        public void RequestReconnect()
+        {
+            _reconnectRequested = true;
         }
 
         private void Emit(FpEvent e)
@@ -115,10 +122,22 @@ namespace CueMiiFingerprintService
 
         private void Loop()
         {
+            int consecutiveFailures = 0;
             while (_running)
             {
                 try
                 {
+                    if (_reconnectRequested)
+                    {
+                        _reconnectRequested = false;
+                        Console.WriteLine("[reader] manual reconnect requested - re-acquiring...");
+                        CloseReader();
+                        consecutiveFailures = 0;
+                        ReaderStatus = "absent";
+                        Emit(new FpEvent { type = "reader", status = "reconnecting" });
+                        Thread.Sleep(500);
+                    }
+
                     EnsureReader();
                     if (_reader == null) { ReaderStatus = "absent"; Thread.Sleep(1500); continue; }
 
@@ -130,9 +149,28 @@ namespace CueMiiFingerprintService
                         CaptureTimeoutMs,
                         _resolution);
 
-                    if (cr == null) continue;
-                    // Timeouts / no-finger: just loop again.
-                    if (cr.ResultCode != Constants.ResultCode.DP_SUCCESS || cr.Data == null) continue;
+                    // A healthy reader returns DP_SUCCESS even when idle, so
+                    // repeated null / non-success results mean the device was lost
+                    // (unplugged, or the handle went stale after sleep/wake).
+                    // Release the reader so it is re-acquired fresh, which restores
+                    // listening automatically once the device is back.
+                    if (cr == null || cr.ResultCode != Constants.ResultCode.DP_SUCCESS)
+                    {
+                        consecutiveFailures++;
+                        if (consecutiveFailures >= 3)
+                        {
+                            Console.WriteLine("[reader] lost (" + (cr == null ? "null" : cr.ResultCode.ToString()) + ") - re-acquiring...");
+                            ReaderStatus = "absent";
+                            Emit(new FpEvent { type = "reader", status = "disconnected" });
+                            CloseReader();
+                            consecutiveFailures = 0;
+                            Thread.Sleep(1000);
+                        }
+                        continue;
+                    }
+
+                    consecutiveFailures = 0;
+                    if (cr.Data == null) continue;
 
                     if (ProcessFid(cr.Data)) Thread.Sleep(CooldownMs);
                 }
@@ -142,6 +180,7 @@ namespace CueMiiFingerprintService
                     Console.WriteLine("[error] " + ex.GetType().Name + ": " + ex.Message);
                     Emit(new FpEvent { type = "reader", status = "error" });
                     CloseReader();
+                    consecutiveFailures = 0;
                     Thread.Sleep(1500);
                 }
             }

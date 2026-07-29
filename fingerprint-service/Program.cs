@@ -109,6 +109,13 @@ namespace CueMiiFingerprintService
                     return;
                 }
 
+                if (req.HttpMethod == "POST" && path == "/reconnect")
+                {
+                    _capture.RequestReconnect();
+                    WriteJson(res, 200, new { ok = true });
+                    return;
+                }
+
                 if (req.HttpMethod == "POST" && path == "/import")
                 {
                     var body = ReadJson(req);

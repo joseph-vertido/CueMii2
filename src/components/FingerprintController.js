@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import useFingerprintService, { READER_STATUS } from '../hooks/useFingerprintService';
-import { startEnroll, cancelEnroll, importEnrollments, getEnrollments, REQUIRED_ENROLLMENT_SAMPLES } from '../utils/fingerprintService';
+import { startEnroll, cancelEnroll, importEnrollments, getEnrollments, reconnectReader, REQUIRED_ENROLLMENT_SAMPLES } from '../utils/fingerprintService';
 import FingerprintModal from './FingerprintModal';
 
 /**
@@ -23,6 +23,7 @@ const FingerprintController = ({
   onCheckIn = () => {},
   onEnroll = () => {},
   onServiceEnrollments = () => {},
+  onAddPlayer = () => 0,
   enabled = true,
   isDarkMode = true,
 }) => {
@@ -31,11 +32,31 @@ const FingerprintController = ({
   const [capturedCount, setCapturedCount] = useState(0);
   const [toast, setToast] = useState(null);
   const modalOpenRef = useRef(false);
+  const toastTimerRef = useRef(null);
 
   const showToast = useCallback((text, tone = 'success') => {
-    setToast({ text, tone });
-    setTimeout(() => setToast(null), 3500);
+    // Cancel any pending dismissal so a new scan restarts the timer instead of
+    // inheriting the previous notification's countdown.
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    // The id changes every time so React remounts the element and the fade
+    // animation restarts from the beginning for the new person.
+    setToast({ text, tone, id: Date.now() });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4500);
   }, []);
+
+  // TEST HELPER: press F1 to simulate a fingerprint scan for a random player.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'F1') return;
+      e.preventDefault();
+      if (!players || players.length === 0) return;
+      const p = players[Math.floor(Math.random() * players.length)];
+      onCheckIn(p.id);
+      showToast(p.name, 'welcome');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [players, onCheckIn, showToast]);
 
   const resetModal = useCallback(() => {
     modalOpenRef.current = false;
@@ -53,7 +74,7 @@ const FingerprintController = ({
           const p = getPlayerById(playerId);
           if (p) {
             onCheckIn(playerId);
-            showToast(`Checked in: ${p.name}`, 'success');
+            showToast(p.name, 'welcome');
           } else {
             showToast('Fingerprint recognized, but player data is missing — sync to restore', 'error');
           }
@@ -137,6 +158,15 @@ const FingerprintController = ({
     resetModal();
   };
 
+  const handleReconnect = async () => {
+    try {
+      await reconnectReader();
+      showToast('Reconnecting reader…', 'success');
+    } catch (e) {
+      showToast('Fingerprint service not reachable', 'error');
+    }
+  };
+
   const statusMeta = {
     [READER_STATUS.UNAVAILABLE]: { label: 'Reader: service offline', dot: 'bg-slate-400' },
     [READER_STATUS.ABSENT]: { label: 'Reader: not connected', dot: 'bg-yellow-400' },
@@ -157,16 +187,41 @@ const FingerprintController = ({
       >
         <span className={`w-2 h-2 rounded-full ${statusMeta.dot}`} />
         {statusMeta.label}
+        <button
+          onClick={handleReconnect}
+          title="Reconnect the fingerprint reader"
+          className={`ml-1 w-4 h-4 flex items-center justify-center rounded-full transition-colors ${
+            isDarkMode ? 'text-slate-400 hover:text-cyan-300 hover:bg-slate-700' : 'text-slate-500 hover:text-cyan-600 hover:bg-slate-100'
+          }`}
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
       </div>
 
       {toast && (
-        <div
-          className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm font-medium shadow-xl ${
-            toast.tone === 'error' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'
-          }`}
-        >
-          {toast.text}
-        </div>
+        toast.tone === 'error' ? (
+          <div key={toast.id} className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm font-medium shadow-xl bg-red-600 text-white">
+            {toast.text}
+          </div>
+        ) : (
+          <div key={toast.id} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 pl-3 pr-6 py-3 rounded-2xl shadow-2xl border text-white animate-fade-in-out border-emerald-500/40 bg-gradient-to-r from-emerald-800 to-green-800">
+            <span className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 ring-1 ring-white/30">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M18.9 7a8 8 0 0 1 1.1 5v1a6 6 0 0 0 .8 3" />
+                <path d="M8 11a4 4 0 0 1 8 0v1a10 10 0 0 0 2 6" />
+                <path d="M12 11v2a14 14 0 0 0 2.5 8" />
+                <path d="M8 15a18 18 0 0 0 1.8 6" />
+                <path d="M4.9 19a22 22 0 0 1 -.9 -7v-1a8 8 0 0 1 12 -6.95" />
+              </svg>
+            </span>
+            <div className="leading-tight">
+              <div className="text-[11px] uppercase tracking-wider text-emerald-50/90">Welcome back</div>
+              <div className="text-xl font-bold text-white">{toast.text}</div>
+            </div>
+          </div>
+        )
       )}
 
       <FingerprintModal
@@ -177,6 +232,7 @@ const FingerprintController = ({
         capturedCount={capturedCount}
         requiredCount={REQUIRED_ENROLLMENT_SAMPLES}
         onStartEnroll={handleStartEnroll}
+        onAddPlayer={onAddPlayer}
         onCancel={handleCancel}
         isDarkMode={isDarkMode}
       />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { showConfirm } from '../utils/appAlert';
 import LevelBadge from './LevelBadge';
 import GenderIcon from './GenderIcon';
 import { formatWaitTime, getWaitTimeColor, getWaitTimeColorLight } from '../utils/formatters';
@@ -238,13 +239,13 @@ const MatchQueue = ({
   };
 
   return (
-    <section className={`backdrop-blur-sm rounded-2xl border overflow-hidden h-full flex flex-col shadow-sm ${
+    <section className={`backdrop-blur-sm rounded-2xl border overflow-hidden h-full flex flex-col panel-depth ${
       isDarkMode ? 'bg-slate-900/50 border-slate-700/50' : 'bg-white border-slate-300'
     }`}>
-      <div className={`bg-gradient-to-r border-b px-4 py-3 ${
+      <div className={`border-b px-4 py-3 ${
         isDarkMode 
-          ? 'from-orange-600/20 to-red-600/20 border-slate-700/50' 
-          : 'from-orange-100 to-red-100 border-slate-300'
+          ? 'bg-slate-800/60 border-slate-700/50' 
+          : 'bg-slate-100 border-slate-300'
       }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -260,9 +261,9 @@ const MatchQueue = ({
               <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 {matches.length} pending · <span className={
                   averageWaitTime >= 60 
-                    ? 'text-red-500 font-semibold' 
+                    ? `font-semibold ${isDarkMode ? 'text-red-400' : 'text-red-600'}` 
                     : averageWaitTime > 40 
-                      ? 'text-red-500' 
+                      ? (isDarkMode ? 'text-red-400' : 'text-red-600') 
                       : averageWaitTime > 30 
                         ? 'text-amber-500' 
                         : averageWaitTime >= 20 
@@ -277,7 +278,7 @@ const MatchQueue = ({
             <button
               onClick={smartQueueAll}
               disabled={getAvailablePoolPlayers().length === 0}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed px-2 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 text-white"
+              className={`px-2 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 disabled:cursor-not-allowed ${isDarkMode ? 'bg-purple-800 hover:bg-purple-700 disabled:bg-slate-600 text-white' : 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-300 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200'}`}
               title="Smart Match all incomplete matches"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -305,9 +306,9 @@ const MatchQueue = ({
             {/* Clear All Matches Button */}
             {matches.length > 0 && matches.some(m => m.players.length > 0) && (
               <button
-                onClick={() => {
+                onClick={async () => {
                   const totalPlayers = matches.reduce((sum, m) => sum + m.players.length, 0);
-                  if (window.confirm(`Clear all players from ${matches.length} matches?\n\nThis will remove ${totalPlayers} player(s) from all matches and return them to the pool.`)) {
+                  if (await showConfirm(`Clear all players from ${matches.length} matches?\n\nThis will remove ${totalPlayers} player(s) from all matches and return them to the pool.`)) {
                     clearAllMatches();
                   }
                 }}
@@ -326,7 +327,7 @@ const MatchQueue = ({
             )}
             <button
               onClick={createMatch}
-              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 px-3 py-1.5 rounded-lg font-semibold transition-all shadow-lg shadow-orange-500/25 flex items-center gap-1 text-sm text-white"
+              className="bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1 text-sm text-white"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -344,8 +345,8 @@ const MatchQueue = ({
             onClick={scrollToTop}
             className={`sticky top-2 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full shadow-xl transition-all flex items-center gap-2 animate-bounce-subtle ${
               isDarkMode 
-                ? 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white shadow-orange-500/30' 
-                : 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white shadow-orange-500/40'
+                ? 'bg-amber-600 hover:bg-amber-500 text-white' 
+                : 'bg-amber-500 hover:bg-amber-400 text-white'
             }`}
             title="Scroll to top"
           >
@@ -399,7 +400,7 @@ const MatchQueue = ({
               let bgClass, borderClass;
               if (isDragOver) {
                 bgClass = isDarkMode ? 'bg-cyan-900/40' : 'bg-cyan-50';
-                borderClass = isDarkMode ? 'border-cyan-400 shadow-lg shadow-cyan-500/20' : 'border-cyan-500 shadow-md shadow-cyan-500/20';
+                borderClass = isDarkMode ? 'border-cyan-400' : 'border-cyan-500';
               } else if (isHighlightedPriority) {
                 bgClass = isDarkMode ? 'bg-emerald-900/30' : 'bg-emerald-50/70';
                 borderClass = 'border-emerald-500 animate-pulse-priority';
@@ -421,7 +422,7 @@ const MatchQueue = ({
                 if (hasPreferredCourts) {
                   selectedClass = isDarkMode ? 'border-amber-400 shadow-lg shadow-amber-500/20' : 'border-amber-500 shadow-md shadow-amber-500/20';
                 } else {
-                  selectedClass = isDarkMode ? 'border-orange-500 shadow-lg shadow-orange-500/10' : 'border-orange-500 shadow-md shadow-orange-500/20';
+                  selectedClass = isDarkMode ? 'border-orange-500' : 'border-orange-500';
                 }
               }
               
@@ -432,7 +433,7 @@ const MatchQueue = ({
                 onDragOver={(e) => handleDragOver(e, match.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, match.id)}
-                className={`rounded-lg border transition-all ${bgClass} ${selectedClass || borderClass} ${
+                className={`queue-card rounded-lg border transition-all ${bgClass} ${selectedClass || borderClass} ${
                   selectedMatchId !== match.id ? 'hover:border-slate-600' : ''
                 }`}
               >
@@ -522,11 +523,11 @@ const MatchQueue = ({
                                     onChange={() => togglePreferredCourt(match.id, court.id)}
                                     className="rounded border-slate-500 bg-slate-700 text-green-500 focus:ring-green-500"
                                   />
-                                  <span className={
+                                  <span className={`uppercase ${
                                     isSelected 
                                       ? (isDarkMode ? 'text-green-400' : 'text-green-700 font-medium') 
                                       : (isDarkMode ? 'text-slate-300' : 'text-slate-700')
-                                  }>
+                                  }`}>
                                     {court.name}
                                   </span>
                                 </label>
@@ -549,18 +550,14 @@ const MatchQueue = ({
                                 ? (isDarkMode ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-600')
                                 : (isDarkMode ? 'bg-slate-600/50 text-slate-400' : 'bg-slate-200 text-slate-600')
                         }`} title="Average wait time for players in this match">
-                          ⏱ {avgWaitTimeMinutes >= 60 ? '1h+' : `${avgWaitTimeMinutes}m`}
+                          <span className="inline-flex items-center gap-0.5 tabular">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {avgWaitTimeMinutes >= 60 ? '1h+' : `${avgWaitTimeMinutes}m`}
+                          </span>
                         </span>
                       )}
-                      <span className={`text-xs font-medium ${
-                        isComplete 
-                          ? (isDarkMode ? 'text-emerald-400' : 'text-emerald-600') 
-                          : isIncomplete
-                            ? 'text-red-500 font-bold'
-                            : (isDarkMode ? 'text-slate-400' : 'text-slate-600')
-                      }`}>
-                        {match.players.length}/4 {isComplete ? '✓' : isIncomplete ? '✗' : ''}
-                      </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       {/* Up/Down arrows for reordering */}
@@ -601,7 +598,7 @@ const MatchQueue = ({
                       <button
                         onClick={() => smartMatch(match.id)}
                         disabled={match.players.length >= 4 || getAvailablePoolPlayers().length === 0}
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed px-2 py-0.5 rounded text-xs font-medium transition-all flex items-center gap-1 text-white"
+                        className={`px-2 py-0.5 rounded text-xs font-medium transition-all flex items-center gap-1 disabled:cursor-not-allowed ${isDarkMode ? 'bg-purple-800 hover:bg-purple-700 disabled:bg-slate-600 text-white' : 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-300 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200'}`}
                         title="Smart Match"
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -640,11 +637,11 @@ const MatchQueue = ({
                         </button>
                       )}
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           const matchToDelete = matches.find(m => m.id === match.id);
                           const playerCount = matchToDelete?.players?.length || 0;
                           const playerNames = matchToDelete?.players?.map(p => p.name).join(', ') || 'No players';
-                          if (window.confirm(`Delete Match #${match.matchNumber}?\n\nPlayers: ${playerCount > 0 ? playerNames : 'None'}\n\nThis will move the match to history.`)) {
+                          if (await showConfirm(`Delete Match #${match.matchNumber}?\n\nPlayers: ${playerCount > 0 ? playerNames : 'None'}\n\nThis will move the match to history.`)) {
                             deleteMatch(match.id);
                           }
                         }}
@@ -668,43 +665,41 @@ const MatchQueue = ({
                           key={index}
                           draggable={!!player}
                           onDragStart={(e) => player && handleDragStart(e, player, match.id)}
-                          className={`flex-1 rounded px-2 py-1.5 border ${
+                          className={`queue-slot relative flex-1 rounded pl-3 pr-2 py-1.5 border ${player ? 'overflow-hidden' : ''} ${
                             player 
                               ? isRecentSmart
-                                ? player.gender === 'male'
-                                  ? isDarkMode 
-                                    ? 'bg-blue-900/60 border-amber-400 ring-2 ring-amber-400/70 animate-smart-match cursor-grab active:cursor-grabbing'
-                                    : 'bg-blue-100 border-amber-500 ring-2 ring-amber-500/70 animate-smart-match cursor-grab active:cursor-grabbing'
-                                  : isDarkMode 
-                                    ? 'bg-pink-900/60 border-amber-400 ring-2 ring-amber-400/70 animate-smart-match cursor-grab active:cursor-grabbing'
-                                    : 'bg-pink-100 border-amber-500 ring-2 ring-amber-500/70 animate-smart-match cursor-grab active:cursor-grabbing'
-                                : player.gender === 'male'
-                                  ? isDarkMode 
-                                    ? 'bg-blue-900/60 border-blue-500/50 cursor-grab active:cursor-grabbing'
-                                    : 'bg-blue-100 border-blue-400 cursor-grab active:cursor-grabbing'
-                                  : isDarkMode 
-                                    ? 'bg-pink-900/60 border-pink-500/50 cursor-grab active:cursor-grabbing'
-                                    : 'bg-pink-100 border-pink-400 cursor-grab active:cursor-grabbing'
+                                ? isDarkMode 
+                                  ? 'bg-slate-900/70 border-amber-400 animate-smart-match cursor-grab active:cursor-grabbing'
+                                  : 'bg-white border-amber-500 animate-smart-match cursor-grab active:cursor-grabbing'
+                                : isDarkMode 
+                                  ? 'bg-slate-900/70 border-slate-700 cursor-grab active:cursor-grabbing'
+                                  : 'bg-white border-slate-300 cursor-grab active:cursor-grabbing'
                               : isDarkMode 
-                                ? 'bg-slate-800/30 border-dashed border-slate-700'
+                                ? 'bg-slate-900/50 border-dashed border-slate-700'
                                 : 'bg-slate-100 border-dashed border-slate-300'
                           }`}
                         >
                           {player ? (
+                            <>
+                            <span className={`neon-bar absolute left-0 top-0 bottom-0 w-1 ${
+                              player.gender === 'male'
+                                ? (isDarkMode ? 'bg-blue-400' : 'bg-blue-600')
+                                : (isDarkMode ? 'bg-pink-400' : 'bg-pink-600')
+                            }`} aria-hidden="true" />
                             <div className="relative group flex items-center justify-between gap-1">
-                              <span className={`truncate font-semibold text-base ${
+                              <span className={`truncate font-medium text-base ${
                                 player.gender === 'male' 
-                                  ? (isDarkMode ? 'text-blue-200' : 'text-blue-800') 
-                                  : (isDarkMode ? 'text-pink-200' : 'text-pink-800')
+                                  ? (isDarkMode ? 'text-blue-300' : 'text-blue-700') 
+                                  : (isDarkMode ? 'text-pink-300' : 'text-pink-700')
                               }`} title={player.name}>
                                 {formatName(player)}
                               </span>
-                              <div className="flex items-center gap-1 text-sm flex-shrink-0">
-                                <span className={`${
+                              <div className="flex items-center gap-1 text-xs flex-shrink-0">
+                                <span className={`inline-flex items-center gap-0.5 tabular ${
                                   isDarkMode ? getWaitTimeColor(player.joinedAt) : getWaitTimeColorLight(player.joinedAt)
-                                }`} title="Wait time">⏱{formatWaitTime(player.joinedAt)}</span>
-                                <span className={isDarkMode ? 'text-emerald-400' : 'text-emerald-600'} title="Games played">🏸{player.playCount || 0}</span>
-                                <span className={`px-1.5 py-0.5 rounded font-bold text-xs ${
+                                }`} title="Wait time"><svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>{formatWaitTime(player.joinedAt)}</span>
+                                <span className={isDarkMode ? 'text-slate-400' : 'text-slate-600'} title="Games played">🏸{player.playCount || 0}</span>
+                                <span className={`px-1 py-0.5 rounded font-bold text-[10px] ${
                                   player.level === 'Expert' 
                                     ? (isDarkMode ? 'bg-purple-500/50 text-purple-200 border border-purple-400/50' : 'bg-purple-100 text-purple-700 border border-purple-400')
                                     : player.level === 'Advanced' 
@@ -729,6 +724,7 @@ const MatchQueue = ({
                                 </button>
                               </div>
                             </div>
+                            </>
                           ) : (
                             (() => {
                               const reservation = matchReservations[match.id]?.[index];
@@ -751,8 +747,8 @@ const MatchQueue = ({
                               
                               return reservation ? (
                                 // Show reserved player
-                                <div className="group flex items-center justify-between gap-1">
-                                  <div className={`flex-1 truncate text-xs ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                                <div className="group flex items-center justify-between gap-1 h-full min-h-[1.75rem]">
+                                  <div className={`flex-1 truncate text-sm ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>
                                     <span className="opacity-70">Waiting for:</span>{' '}
                                     <span className="font-medium">{(() => {
                                       const parts = reservation.name.split(' ');
@@ -764,14 +760,14 @@ const MatchQueue = ({
                                   </div>
                                   <button
                                     onClick={() => clearReservation(match.id, index)}
-                                    className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                                    className={`p-1 flex-shrink-0 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
                                       isDarkMode 
                                         ? 'text-red-400 hover:text-red-300 hover:bg-red-500/20' 
                                         : 'text-red-500 hover:text-red-600 hover:bg-red-100'
                                     }`}
                                     title="Clear reservation"
                                   >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                   </button>
@@ -896,22 +892,22 @@ const MatchQueue = ({
                           let buttonClass;
                           if (hasPreferredCourts) {
                             buttonClass = isDarkMode 
-                              ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400' 
-                              : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-400';
+                              ? 'bg-amber-800 hover:bg-amber-700 text-amber-50' 
+                              : 'bg-amber-200 hover:bg-amber-300 text-amber-900 border border-amber-400';
                           } else if (isWantedByHigher) {
                             buttonClass = isDarkMode 
-                              ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400' 
-                              : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-400';
+                              ? 'bg-amber-800 hover:bg-amber-700 text-amber-50' 
+                              : 'bg-amber-200 hover:bg-amber-300 text-amber-900 border border-amber-400';
                           } else {
                             buttonClass = isDarkMode 
-                              ? 'bg-green-600/30 hover:bg-green-600/40 text-green-400' 
-                              : 'bg-green-100 hover:bg-green-200 text-green-700 border border-green-500';
+                              ? 'bg-cyan-800 hover:bg-cyan-700 text-cyan-50' 
+                              : 'bg-cyan-200 hover:bg-cyan-300 text-cyan-900 border border-cyan-400';
                           }
                           return (
                             <button
                               key={court.id}
                               onClick={() => moveMatchToCourt(match.id, court.id)}
-                              className={`flex-1 ${buttonClass} text-xs py-1 rounded transition-colors flex items-center justify-center gap-0.5`}
+                              className={`flex-1 ${buttonClass} h-5 text-[11px] font-bold uppercase rounded transition-colors flex items-center justify-center gap-1`}
                               title={isWantedByHigher && !hasPreferredCourts ? 'Other matches are waiting for this court' : ''}
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

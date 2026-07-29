@@ -12,7 +12,8 @@ import { getDaysUntilExpiration } from '../utils/licenseUtils';
  * @param {Function} props.onOpenSettings - Callback to open settings modal
  * @param {Function} props.onResetData - Callback to reset all application data
  * @param {boolean} props.isDarkMode - Current theme mode
- * @param {Function} props.toggleTheme - Callback to toggle theme
+ * @param {Function} props.toggleTheme - Callback to cycle theme
+ * @param {string} props.theme - Active theme: 'light' | 'dark' | 'neon'
  * @param {object} props.licenseInfo - Current license information
  * @param {string} props.syncStatus - Cloud sync status
  * @param {boolean} props.isOnline - Online status
@@ -27,6 +28,7 @@ const Header = ({
   onResetData, 
   isDarkMode, 
   toggleTheme, 
+  theme = 'dark', 
   licenseInfo,
   syncStatus = 'idle',
   isOnline = true,
@@ -84,13 +86,13 @@ const Header = ({
   return (
     <header className={`relative border-b backdrop-blur-sm ${
       isDarkMode 
-        ? 'bg-gradient-to-r from-slate-900/90 via-slate-800/90 to-slate-900/90 border-pink-500/20' 
-        : 'bg-gradient-to-r from-slate-100 via-white to-slate-100 border-pink-400/40 shadow-sm'
+        ? 'bg-slate-900/90 border-slate-700/60' 
+        : 'bg-slate-100 border-slate-300'
     }`}>
       <div className="max-w-[1920px] mx-auto px-6 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img 
-            src="/banner.jpg" 
+            src="/banner.png" 
             alt="Baddixx" 
             className="h-10 w-auto object-contain"
           />
@@ -110,9 +112,13 @@ const Header = ({
             onClick={onOpenAbout}
             className={`p-2 rounded-lg font-semibold transition-all flex items-center gap-1 ${
               isExpired
-                ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50 animate-pulse'
+                ? (isDarkMode
+                    ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50 animate-pulse'
+                    : 'bg-red-100 hover:bg-red-200 text-red-700 border border-red-400 animate-pulse')
                 : showWarning
-                  ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/50'
+                  ? (isDarkMode
+                      ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/50'
+                      : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-400')
                   : isDarkMode 
                     ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' 
                     : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-300'
@@ -143,30 +149,47 @@ const Header = ({
             </svg>
           </button>
 
-          {/* Theme Toggle */}
+          {/* Theme Toggle: Light -> Dark -> Neon */}
           <button
             onClick={toggleTheme}
-            className={`p-2 rounded-lg font-semibold transition-all flex items-center gap-1 ${
-              isDarkMode 
-                ? 'bg-slate-700 hover:bg-slate-600 text-yellow-400' 
-                : 'bg-amber-100 hover:bg-amber-200 text-amber-600 border border-amber-300'
+            className={`theme-toggle p-2 rounded-lg font-semibold transition-all flex items-center gap-1 ${
+              theme === 'neon'
+                ? 'bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/60'
+                : theme === 'dark'
+                  ? 'bg-slate-700 hover:bg-slate-600 text-yellow-400'
+                  : 'bg-amber-100 hover:bg-amber-200 text-amber-600 border border-amber-300'
             }`}
-            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            title={
+              theme === 'light' ? 'Switch to Dark Mode'
+                : theme === 'dark' ? 'Switch to Neon Mode'
+                  : 'Switch to Light Mode'
+            }
           >
-            {isDarkMode ? (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            ) : (
+            {theme === 'light' ? (
+              /* moon: next is dark */
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            ) : theme === 'dark' ? (
+              /* lightning: next is neon */
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5z" />
+              </svg>
+            ) : (
+              /* sun: next is light */
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
             )}
           </button>
           
           <button
             onClick={onOpenHistory}
-            className="bg-violet-600 hover:bg-violet-500 px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 text-white shadow-md shadow-violet-500/25"
+            className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
+              isDarkMode 
+                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white' 
+                : 'bg-slate-200 hover:bg-slate-300 text-slate-700 hover:text-slate-900 border border-slate-300'
+            }`}
             title="View match history"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -176,7 +199,11 @@ const Header = ({
           </button>
           <button
             onClick={onOpenReports}
-            className="bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-400 hover:to-violet-400 px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 text-white shadow-md shadow-purple-500/25"
+            className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
+              isDarkMode 
+                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white' 
+                : 'bg-slate-200 hover:bg-slate-300 text-slate-700 hover:text-slate-900 border border-slate-300'
+            }`}
             title="View reports and statistics"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -200,7 +227,7 @@ const Header = ({
           </button>
           <button
             onClick={onOpenDatabase}
-            className="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-md shadow-pink-500/25 flex items-center gap-1.5 text-white"
+            className="bg-cyan-700 hover:bg-cyan-600 px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 text-white"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />

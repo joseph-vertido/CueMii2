@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { showAlert, showConfirm } from '../utils/appAlert';
+import ThemedSelect from './ThemedSelect';
 
 /**
  * Reports Modal - Shows comprehensive match and player statistics
@@ -626,8 +628,8 @@ const ReportsModal = ({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [playersWithData, playerSearchTerm]);
 
-  const handleClearReports = () => {
-    if (window.confirm('Are you sure you want to clear all match history and reports?\n\nThis action cannot be undone.')) {
+  const handleClearReports = async () => {
+    if (await showConfirm('Are you sure you want to clear all match history and reports?\n\nThis action cannot be undone.')) {
       onClearReports();
     }
   };
@@ -722,14 +724,14 @@ const ReportsModal = ({
     try {
       const element = reportType === 'overall' ? overallReportRef.current : individualReportRef.current;
       if (!element) {
-        alert('No report content to export');
+        showAlert('No report content to export');
         setIsExporting(false);
         return;
       }
 
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
-        alert('Please allow pop-ups to export PDF');
+        showAlert('Please allow pop-ups to export PDF');
         setIsExporting(false);
         return;
       }
@@ -870,7 +872,7 @@ const ReportsModal = ({
       
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      alert('Error exporting PDF. Please try again.');
+      showAlert('Error exporting PDF. Please try again.');
     }
     setIsExporting(false);
   };
@@ -889,41 +891,42 @@ const ReportsModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`rounded-2xl w-[1100px] h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border ${
+      <div className={`neon-panel rounded-2xl w-[1100px] h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border ${
         isDarkMode 
-          ? 'bg-gradient-to-br from-slate-900 to-slate-800 border-violet-500/30' 
+          ? 'bg-slate-900 border-violet-500/30' 
           : 'bg-white border-violet-300'
       }`}>
         {/* Header */}
-        <div className="bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-3 flex justify-between items-center flex-shrink-0">
+        <div className={`px-6 py-3 flex justify-between items-center flex-shrink-0 border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
           <div className="flex items-center gap-3">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-6 h-6 ${isDarkMode ? 'text-white' : 'text-slate-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            <h2 className="text-xl font-bold text-white">Reports</h2>
+            <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Reports</h2>
           </div>
           <div className="flex items-center gap-3">
-            <select
+            <ThemedSelect
+              className="w-48 flex-none"
               value={selectedDate}
               onChange={(e) => {
                 setSelectedDate(e.target.value);
                 setSelectedPlayerId(null);
               }}
-              className="bg-white/20 text-white px-3 py-1.5 rounded-lg text-sm font-medium border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50"
+              isDarkMode={isDarkMode}
             >
-              <option value="all" className="text-slate-800">All Time</option>
+              <option value="all">All Time</option>
               {uniqueDates.map(date => (
-                <option key={date} value={date} className="text-slate-800">{formatDate(date)}</option>
+                <option key={date} value={date}>{formatDate(date)}</option>
               ))}
-            </select>
+            </ThemedSelect>
 
             <button
               onClick={() => exportToPDF(activeTab)}
               disabled={isExporting || (activeTab === 'individual' && !selectedPlayer)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border shadow-sm transition-colors flex items-center gap-1.5 ${
                 isExporting || (activeTab === 'individual' && !selectedPlayer)
-                  ? 'bg-white/10 text-white/50 cursor-not-allowed'
-                  : 'bg-white/20 hover:bg-white/30 text-white'
+                  ? (isDarkMode ? 'bg-slate-700 text-slate-400 border-slate-600 cursor-not-allowed' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed')
+                  : 'bg-cyan-600 hover:bg-cyan-500 text-white border-cyan-500'
               }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -934,7 +937,7 @@ const ReportsModal = ({
             
             <button
               onClick={handleClearReports}
-              className="bg-red-500/30 hover:bg-red-500/50 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${isDarkMode ? 'bg-red-500/30 hover:bg-red-500/50 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'}`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -944,7 +947,7 @@ const ReportsModal = ({
             
             <button 
               onClick={onClose} 
-              className="text-white/80 hover:text-white text-2xl font-light transition-colors ml-2"
+              className={`text-2xl font-light transition-colors ml-2 ${isDarkMode ? 'text-white/80 hover:text-white' : 'text-slate-500 hover:text-slate-800'}`}
             >
               &times;
             </button>

@@ -2,32 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom Scrollbar Styles */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+/* Slightly smaller base font so text feels less cramped. All Tailwind text-*
+   sizes are rem-based, so they scale down proportionally from this. */
+html {
+  font-size: 15px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(30, 41, 59, 0.5);
-  border-radius: 3px;
+/* Base typography — Inter for the whole UI (timers included, just tabular figures) */
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.5);
-  border-radius: 3px;
+/* Check-in notification entrance */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.28s ease-out;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.7);
+/* Check-in notification full lifecycle: fade in, hold, fade out (~3.5s) */
+@keyframes fade-in-out {
+  0%   { opacity: 0; transform: translate(-50%, 12px); }
+  6%   { opacity: 1; transform: translate(-50%, 0); }
+  88%  { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 6px); }
+}
+.animate-fade-in-out {
+  animation: fade-in-out 4.5s ease-in-out forwards;
 }
 
-/* Pulsating Border Animation for newly assigned courts */
+/* ---------------------------------------------------------------
+   Scrollbars: one consistent look everywhere — main panels, modals
+   (Reports, History, Manage Players) and dropdown lists. Previously
+   some areas used a 6px dark-only bar while others fell back to the
+   native browser scrollbar, so they differed in width and colour.
+   --------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(226, 232, 240, 0.7);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.85);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.95);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.85) rgba(226, 232, 240, 0.7);
+}
+
+/* Dark theme */
+.dark ::-webkit-scrollbar-track {
+  background: rgba(2, 6, 23, 0.6);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.75);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.95);
+}
+
+.dark * {
+  scrollbar-color: rgba(71, 85, 105, 0.75) rgba(2, 6, 23, 0.6);
+}
+
+/* Pulsating glow for newly assigned courts.
+   Matches the soft two-layer glow used by the player pool cards (no hard
+   spread ring, which read as a solid expanding band). */
 @keyframes pulse-border {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(255, 235, 59, 0.9), 0 0 10px rgba(255, 235, 59, 0.7);
+    box-shadow: 0 0 4px rgba(250, 204, 21, 0.5), 0 0 8px rgba(250, 204, 21, 0.3);
   }
   50% {
-    box-shadow: 0 0 0 5px rgba(255, 235, 59, 0.5), 0 0 20px rgba(255, 235, 59, 0.9);
+    box-shadow: 0 0 10px rgba(250, 204, 21, 0.7), 0 0 20px rgba(250, 204, 21, 0.5);
   }
 }
 
@@ -35,18 +106,36 @@
   animation: pulse-border 1.5s ease-in-out infinite;
 }
 
-/* Pulsating glow animation for smart matched players */
-@keyframes pulse-smart-match {
+/* Status dot for a newly assigned court: shifts cyan -> yellow on exactly the
+   same cycle as the card's glow, so the dot brightens and fades with it. */
+@keyframes pulse-dot-assigned {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.8), 0 0 8px rgba(251, 191, 36, 0.6);
+    background-color: #06b6d4; /* cyan-500 */
+    box-shadow: 0 0 0 rgba(250, 204, 21, 0);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.4), 0 0 16px rgba(251, 191, 36, 0.8);
+    background-color: #facc15; /* yellow-400 */
+    box-shadow: 0 0 6px rgba(250, 204, 21, 0.8);
+  }
+}
+
+.animate-pulse-dot-assigned {
+  animation: pulse-dot-assigned 1.5s ease-in-out infinite;
+}
+
+/* Pulsating glow for smart matched players.
+   Matches the soft two-layer halo used by the player pool cards. */
+@keyframes pulse-smart-match {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(251, 191, 36, 0.5), 0 0 8px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.7), 0 0 20px rgba(251, 191, 36, 0.5);
   }
 }
 
 .animate-smart-match {
-  animation: pulse-smart-match 1.2s ease-in-out infinite;
+  animation: pulse-smart-match 1.5s ease-in-out infinite;
 }
 
 /* Pulsating red border animation for returned matches */
@@ -94,10 +183,10 @@
 /* Pulsing glow animations for player wait times */
 @keyframes pulse-glow-green {
   0%, 100% {
-    box-shadow: 0 0 4px rgba(52, 211, 153, 0.4), 0 0 8px rgba(52, 211, 153, 0.2);
+    box-shadow: 0 0 2px rgba(52, 211, 153, 0.45), 0 0 4px rgba(52, 211, 153, 0.2);
   }
   50% {
-    box-shadow: 0 0 8px rgba(52, 211, 153, 0.6), 0 0 16px rgba(52, 211, 153, 0.4);
+    box-shadow: 0 0 4px rgba(52, 211, 153, 0.85), 0 0 7px rgba(52, 211, 153, 0.4);
   }
 }
 
@@ -107,10 +196,10 @@
 
 @keyframes pulse-glow-yellow {
   0%, 100% {
-    box-shadow: 0 0 4px rgba(250, 204, 21, 0.5), 0 0 8px rgba(250, 204, 21, 0.3);
+    box-shadow: 0 0 2px rgba(250, 204, 21, 0.5), 0 0 4px rgba(250, 204, 21, 0.22);
   }
   50% {
-    box-shadow: 0 0 10px rgba(250, 204, 21, 0.7), 0 0 20px rgba(250, 204, 21, 0.5);
+    box-shadow: 0 0 4px rgba(250, 204, 21, 0.9), 0 0 7px rgba(250, 204, 21, 0.45);
   }
 }
 
@@ -120,10 +209,10 @@
 
 @keyframes pulse-glow-red {
   0%, 100% {
-    box-shadow: 0 0 6px rgba(248, 113, 113, 0.6), 0 0 12px rgba(248, 113, 113, 0.4);
+    box-shadow: 0 0 2px rgba(248, 113, 113, 0.55), 0 0 4px rgba(248, 113, 113, 0.25);
   }
   50% {
-    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8), 0 0 24px rgba(248, 113, 113, 0.6);
+    box-shadow: 0 0 4px rgba(248, 113, 113, 0.95), 0 0 8px rgba(248, 113, 113, 0.5);
   }
 }
 
@@ -134,4 +223,344 @@
 /* Background Pattern */
 .bg-pattern {
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2306b6d4' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ---------------------------------------------------------------
+   Aurora (step 1): ambient glow + panel depth.
+   Deliberately avoids backdrop-filter/blur so there is no GPU cost
+   on kiosk hardware. Dark mode only.
+   --------------------------------------------------------------- */
+
+/* Soft colour wash behind the whole app. Fixed + non-interactive. */
+.aurora-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(45rem 22rem at 22% -8%, rgba(34, 211, 238, 0.14), transparent 70%),
+    radial-gradient(38rem 20rem at 82% -6%, rgba(212, 83, 126, 0.12), transparent 70%),
+    radial-gradient(42rem 22rem at 50% 108%, rgba(129, 140, 248, 0.10), transparent 70%);
+}
+
+/* Panel elevation: drop shadow + a 1px inner top highlight so edges catch
+   the light and panels read as layered rather than flat. */
+.panel-depth {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 26px -14px rgba(0, 0, 0, 0.85);
+}
+
+/* Cards sitting inside a panel get a lighter version. */
+.card-depth {
+  box-shadow: 0 4px 12px -8px rgba(0, 0, 0, 0.8);
+}
+
+/* Newly assigned court: top strip alternates between the live cyan and yellow
+   on the same 1.5s cycle as the card glow and status dot. */
+@keyframes pulse-strip-assigned {
+  0%, 100% { background-color: #06b6d4; }
+  50%      { background-color: #facc15; }
+}
+
+.animate-strip-assigned {
+  animation: pulse-strip-assigned 1.5s ease-in-out infinite;
+}
+
+/* ===============================================================
+   NEON MODE
+   A variant of dark mode: the app keeps all its dark styling and
+   this layer adds the neon character on top — deeper surfaces,
+   glowing accents, and outlined buttons.
+
+   Deliberately restrained: player and court NAMES stay flat so they
+   remain legible across a room. The glow is reserved for timers,
+   status strips, buttons, pills and notifications.
+   =============================================================== */
+
+/* --- Surfaces ------------------------------------------------- */
+.neon {
+  background-color: #05070d !important;
+}
+
+.neon .aurora-bg {
+  background:
+    radial-gradient(45rem 22rem at 22% -8%, rgba(34, 211, 238, 0.20), transparent 70%),
+    radial-gradient(38rem 20rem at 82% -6%, rgba(244, 114, 182, 0.16), transparent 70%),
+    radial-gradient(42rem 22rem at 50% 108%, rgba(192, 132, 252, 0.14), transparent 70%);
+}
+
+.neon .panel-depth {
+  background-color: #080d16;
+  border-color: rgba(34, 211, 238, 0.18);
+  box-shadow:
+    inset 0 0 26px -16px rgba(34, 211, 238, 0.75),
+    0 0 22px -14px rgba(34, 211, 238, 0.5);
+}
+
+.neon .card-depth {
+  background-color: #040a12;
+}
+
+/* --- Glowing timers and numeric readouts ---------------------- */
+.neon .neon-timer {
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* --- Court status strips -------------------------------------- */
+.neon .court-strip {
+  height: 2px;
+  box-shadow: 0 0 8px currentColor;
+}
+.neon .court-strip.bg-cyan-500 { box-shadow: 0 0 8px #22d3ee, 0 0 16px #22d3ee; }
+.neon .court-strip.bg-amber-500 { box-shadow: 0 0 8px #f59e0b, 0 0 16px #f59e0b; }
+.neon .court-strip.bg-red-500 { box-shadow: 0 0 8px #ef4444, 0 0 16px #ef4444; }
+
+/* --- Status dots ---------------------------------------------- */
+.neon .bg-cyan-500.rounded-full { box-shadow: 0 0 7px #22d3ee; }
+.neon .bg-amber-500.rounded-full { box-shadow: 0 0 7px #f59e0b; }
+.neon .bg-red-500.rounded-full { box-shadow: 0 0 7px #ef4444; }
+.neon .bg-emerald-500.rounded-full { box-shadow: 0 0 7px #10b981; }
+
+/* --- Buttons: outlined with a glow instead of solid fills ------ */
+.neon .bg-cyan-600,
+.neon .bg-cyan-700,
+.neon .bg-cyan-800 {
+  background-color: #031a20;
+  border: 1px solid rgba(34, 211, 238, 0.65);
+  color: #5ff5ff;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.3);
+  text-shadow: 0 0 6px rgba(34, 211, 238, 0.6);
+}
+.neon .bg-cyan-600:not(:disabled):hover,
+.neon .bg-cyan-700:not(:disabled):hover,
+.neon .bg-cyan-800:not(:disabled):hover {
+  background-color: #05262e;
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.5);
+}
+
+.neon .bg-purple-800,
+.neon .bg-purple-700 {
+  background-color: #150a24;
+  border: 1px solid rgba(192, 132, 252, 0.6);
+  color: #d8b4fe;
+  box-shadow: 0 0 12px rgba(192, 132, 252, 0.28);
+}
+.neon .bg-purple-800:not(:disabled):hover,
+.neon .bg-purple-700:not(:disabled):hover {
+  background-color: #1d0f31;
+  box-shadow: 0 0 18px rgba(192, 132, 252, 0.45);
+}
+
+.neon .bg-amber-600,
+.neon .bg-amber-700,
+.neon .bg-amber-800 {
+  background-color: #1e1206;
+  border: 1px solid rgba(251, 146, 60, 0.6);
+  color: #ffb066;
+  box-shadow: 0 0 12px rgba(251, 146, 60, 0.28);
+}
+
+.neon .bg-red-600 {
+  background-color: #1a0710;
+  border: 1px solid rgba(244, 63, 94, 0.55);
+  color: #ff6b85;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.25);
+}
+
+/* --- Check-in notification ------------------------------------ */
+.neon .animate-fade-in-out {
+  background: #031a12 !important;
+  border-color: rgba(74, 222, 128, 0.65) !important;
+  box-shadow: 0 0 26px rgba(74, 222, 128, 0.35), inset 0 0 18px -10px rgba(74, 222, 128, 0.5);
+}
+
+/* --- Pool card wait glows burn a little brighter --------------- */
+.neon .animate-pulse-glow-green,
+.neon .animate-pulse-glow-yellow,
+.neon .animate-pulse-glow-red {
+  filter: saturate(1.3) brightness(1.12);
+}
+
+/* --- Theme toggle itself --------------------------------------- */
+.neon .theme-toggle {
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.35);
+}
+
+/* --- Neon: player pool & match queue --------------------------- */
+
+/* Numeric readouts (wait times, games, timers) pick up a soft glow */
+.neon .tabular {
+  text-shadow: 0 0 6px currentColor;
+}
+
+/* Section count pills become outlined and lit */
+.neon .count-pill {
+  background-color: transparent;
+  box-shadow: 0 0 9px -1px currentColor, inset 0 0 8px -5px currentColor;
+  border: 1px solid currentColor;
+}
+
+/* Pool cards and queue slots: deeper wells with a cyan-tinted edge */
+.neon .pool-card,
+.neon .queue-slot {
+  background-color: #040a12;
+  border-color: rgba(34, 211, 238, 0.16);
+}
+
+.neon .pool-card:hover,
+.neon .queue-slot:hover {
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow: 0 0 12px -4px rgba(34, 211, 238, 0.5);
+}
+
+.neon .queue-card {
+  background-color: #080d16;
+  border-color: rgba(34, 211, 238, 0.18);
+}
+
+/* The gender accent bar on a queue slot becomes a light strip */
+.neon .neon-bar {
+  box-shadow: 0 0 8px currentColor;
+}
+.neon .neon-bar.bg-blue-400 { box-shadow: 0 0 8px #60a5fa, 0 0 14px #60a5fa; }
+.neon .neon-bar.bg-pink-400 { box-shadow: 0 0 8px #f472b6, 0 0 14px #f472b6; }
+
+/* Gender-coloured names shift to neon tones (no blur — keeps them crisp) */
+.neon .text-blue-300 { color: #7dd8ff; }
+.neon .text-pink-300 { color: #ff8fd4; }
+
+/* Level badges outline instead of filling */
+.neon .rounded-full.border {
+  box-shadow: 0 0 8px -2px currentColor;
+}
+
+/* Search field and dropdown triggers get a lit edge on focus */
+.neon input:focus,
+.neon .theme-toggle:focus {
+  box-shadow: 0 0 12px -2px rgba(34, 211, 238, 0.7);
+  border-color: rgba(34, 211, 238, 0.7);
+}
+
+/* Empty match slots: dashed cyan rather than grey */
+.neon .queue-slot.border-dashed {
+  border-color: rgba(34, 211, 238, 0.22);
+}
+
+/* --- Neon: modal windows (Options, Manage Players, History, Reports,
+       About/License) ------------------------------------------------ */
+.neon .neon-panel {
+  background-color: #080d16;
+  border-color: rgba(34, 211, 238, 0.22);
+  box-shadow:
+    0 0 34px -14px rgba(34, 211, 238, 0.55),
+    inset 0 0 26px -18px rgba(34, 211, 238, 0.7);
+}
+
+/* Section/header bars and sticky table heads inside a neon panel */
+.neon .neon-panel .bg-slate-800,
+.neon .neon-panel .bg-slate-800\/60,
+.neon .neon-panel .bg-slate-800\/50 {
+  background-color: #05070d;
+}
+
+/* Inner wells: inputs, cards and list rows */
+.neon .neon-panel .bg-slate-900,
+.neon .neon-panel .bg-slate-900\/50,
+.neon .neon-panel .bg-slate-900\/70 {
+  background-color: #040a12;
+}
+
+/* Hairlines pick up the cyan tint */
+.neon .neon-panel .border-slate-700,
+.neon .neon-panel .border-slate-700\/50,
+.neon .neon-panel .border-slate-700\/60,
+.neon .neon-panel .border-slate-600 {
+  border-color: rgba(34, 211, 238, 0.18);
+}
+
+/* Table rows */
+.neon .neon-panel tbody tr {
+  border-color: rgba(34, 211, 238, 0.12);
+}
+.neon .neon-panel tbody tr:hover {
+  background-color: rgba(34, 211, 238, 0.05);
+}
+
+/* Small square action buttons in the player table get a lit edge */
+.neon .neon-panel .rounded-md {
+  box-shadow: 0 0 9px -3px currentColor;
+}
+
+/* Active tab underline in Reports */
+.neon .neon-panel .border-b-2 {
+  box-shadow: 0 2px 10px -3px currentColor;
+}
+
+/* --- Neon: disabled controls stay flat and unlit ------------------ */
+.neon button:disabled {
+  background-color: #0d131d !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  color: #5a6b80 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* --- Neon: hover states for the amber/red buttons ----------------
+   Without an explicit neon hover, Tailwind's hover:bg-amber-500 fills
+   the button with bright amber while the neon rule keeps light amber
+   text — which is unreadable. These win on specificity. */
+.neon .bg-amber-600:not(:disabled):hover,
+.neon .bg-amber-700:not(:disabled):hover,
+.neon .bg-amber-800:not(:disabled):hover {
+  background-color: #2c1a08;
+  color: #ffd0a3;
+  box-shadow: 0 0 18px rgba(251, 146, 60, 0.45);
+}
+
+.neon .bg-red-600:not(:disabled):hover,
+.neon .bg-red-500:not(:disabled):hover {
+  background-color: #2a0a15;
+  color: #ff9aac;
+  box-shadow: 0 0 18px rgba(244, 63, 94, 0.4);
+}
+
+/* --- Neon: match card highlight states ---------------------------
+   The blanket .queue-card surface above would otherwise flatten these,
+   so each state is restated with higher specificity. */
+
+/* Drag-over: the match under the cursor lights up */
+.neon .queue-card.border-cyan-400 {
+  background-color: #04222b;
+  border-color: #22d3ee;
+  box-shadow:
+    0 0 24px -4px rgba(34, 211, 238, 0.7),
+    inset 0 0 22px -12px rgba(34, 211, 238, 0.9);
+}
+
+/* Higher-priority flash */
+.neon .queue-card.border-emerald-500 {
+  background-color: #04231a;
+  border-color: #34d399;
+  box-shadow: 0 0 20px -5px rgba(52, 211, 153, 0.6);
+}
+
+/* Just returned to queue */
+.neon .queue-card.border-red-500 {
+  background-color: #240a12;
+  border-color: #f43f5e;
+  box-shadow: 0 0 20px -5px rgba(244, 63, 94, 0.55);
+}
+
+/* Match with preferred courts */
+.neon .queue-card.border-amber-500\/50 {
+  background-color: #241703;
+  border-color: rgba(251, 146, 60, 0.6);
+  box-shadow: 0 0 18px -6px rgba(251, 146, 60, 0.5);
+}
+
+/* Selected match */
+.neon .queue-card.border-orange-500 {
+  border-color: #fb923c;
+  box-shadow: 0 0 18px -5px rgba(251, 146, 60, 0.6);
 }

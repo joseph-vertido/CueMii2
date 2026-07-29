@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 4.3.5**
+**Version 4.14.2**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -252,6 +252,190 @@ and compares it to the running `APP_VERSION`. Once a bumped version is pushed to
 > below is retained for legacy history.
 
 ## Version History
+
+- **v4.14.2** - In-app password dialog; neon accent bar thickness fixed
+
+- **v4.14.1** - Confirmation dialogs centred in-app (no browser popups remain)
+
+- **v4.14.0** - Centred in-app warning dialogs; reverted neon queue contrast
+
+- **v4.13.4** - Neon: more contrast between match cards and player slots
+
+- **v4.13.3** - Neon: readable amber button hovers and restored match drag-over highlight
+
+- **v4.13.2** - Neon in modal windows; disabled buttons stay unlit; narrower About window
+
+- **v4.13.1** - Neon Mode extended to the player pool and match queue
+
+- **v4.13.0** - New Neon Mode (Light / Dark / Neon theme cycle)
+
+- **v4.12.14** - Lighter Not Present names and court names
+
+- **v4.12.13** - Lighter DB name text; slightly darker light-mode court buttons
+
+- **v4.12.12** - Lighter player name weight; wider Fingerprint column
+
+- **v4.12.11** - Unified scrollbars, washed-out light-mode buttons, cyan panel icons, swapped Status/Fingerprint columns
+
+- **v4.12.10** - Muted Smart buttons, lighter light-mode court buttons, matching wait-time red
+
+- **v4.12.9** - Muted full-width court buttons; slightly larger table headers
+
+- **v4.12.8** - Icon Save/Cancel buttons; even column spacing in Player Database
+
+- **v4.12.7** - Player Database headers with icons in mixed case
+
+- **v4.12.6** - Player Database table restyled with icon action buttons
+
+- **v4.12.5** - Cyan export buttons; centred, content-width court buttons
+
+- **v4.12.4** - Longer Reports date selector, green Export PDF, matching Add New Player chevron
+
+- **v4.12.3** - Portal-rendered dropdown lists (fixes pool filter); larger dropdowns; matching red Clear History
+
+- **v4.12.2** - Restored pool level filter; smaller dropdowns; solid History buttons
+
+- **v4.12.1** - Custom dropdown lists matching the reservation dropdown
+
+- **v4.12.0** - Unified dropdown styling across the whole app (ThemedSelect)
+
+- **v4.11.16** - Grey Add New Player section; cleaner dropdowns that no longer overflow
+
+- **v4.11.15** - Blue Add to Pool button and Stored pills in light mode
+
+- **v4.11.14** - License Information spans the full top of the About window
+
+- **v4.11.13** - Matching level pills and readable light-mode buttons/pills in Manage Players
+
+- **v4.11.12** - Manage Players window now supports light mode
+
+- **v4.11.11** - Reservations respected when moving between matches; reservation slots stay pinned
+
+- **v4.11.10** - Reserved slots no longer block adding other players to a match
+
+- **v4.11.9** - Darker search bar and New court input in dark mode
+
+- **v4.11.8** - Purple Smart / Smart All buttons
+
+- **v4.11.7** - Add New Player collapses on close; darker court player cards
+
+- **v4.11.6** - Brighter, tighter player pool card glow
+
+- **v4.11.5** - Pool card ✕ button only shows on hover
+
+- **v4.11.4** - Court red threshold at 30 min; grey games counter
+
+- **v4.11.3** - Softer pool glow, alternating court strip, flipped return arrow, longer welcome toast
+
+- **v4.11.2** - Level dropdown bg, no static yellow border in dark, removed x/4 badge, darker scrollbars app-wide
+
+- **v4.11.1** - Darker queue slots, yellow new-court strip, return icon, white welcome name, darker pool scrollbar
+
+- **v4.11.0** - Aurora glow + panel depth; fixed ✕ removal while searching
+
+- **v4.10.5** - Yellow border on newly assigned courts
+
+- **v4.10.4** - Court status dot color animates in sync with the assign glow
+
+- **v4.10.3** - Cyan court-assign buttons, synced court dot glow, softened smart-match glow
+
+- **v4.10.2** - Concise higher-priority match warning
+
+- **v4.10.1** - Court assign glow matches the player pool card glow
+
+- **v4.10.0** - Smart fills respect reservations; reserved row centered/larger; amber Top button
+
+- **v4.9.17** - Fixed reserve-player dropdown; removed Reset FP button
+
+- **v4.9.16** - Confirmation prompt before deleting a player
+
+- **v4.9.15** - Court rename box shrinks so the ✓/✕ buttons stay inside the card
+
+- **v4.9.14** - Court names display in all caps
+
+- **v4.9.13** - Bold court button labels in the match queue
+
+- **v4.9.12** - Queue card spacing/sizing, History button restyled, green solid court buttons
+
+- **v4.9.11** - Full-height gender accent on queue cards; pool search clears on drag-drop
+
+- **v4.9.10** - Gender-colored vertical line beside match queue player names
+
+- **v4.9.9** - Match queue: neutral player slots with gender-colored names
+
+- **v4.9.8** - "In Court" count shown as a pill badge to match other sections
+
+- **v4.9.7** - Darker green (and amber/red) for license values in light mode
+
+- **v4.9.6** - Player pool card glow thresholds: 5/10/15 min
+
+- **v4.9.5** - Check-in notification uses the same green in both light and dark mode
+
+- **v4.9.4** - Lighter light-mode check-in toast + bigger colored name; readable About/License warning button
+
+- **v4.9.3** - Check-in notification restarts cleanly on rapid consecutive scans
+
+- **v4.9.2** - Manage Players A-Z filter resets on reopen and after pool actions
+
+- **v4.9.1** - Reports light-mode controls fixed; darker green check-in toast with fade-out
+
+- **v4.9.0** - Light-mode header fixes, welcome check-in notification, F1 test scan, day-pass expiry fix, timer font + more
+
+- **v4.8.2** - Reverted court text scaling (kept smaller Return/Done buttons)
+
+- **v4.8.1** - Smaller court card text and Return/Done buttons
+
+- **v4.8.0** - Court status strips, pool initials avatars, count badges, rounded search
+
+- **v4.7.7** - Root font size set to 14px
+
+- **v4.7.6** - Slightly smaller base font (15px root) for a less cramped feel
+
+- **v4.7.5** - Reverted court card resizing (kept "✓-In" label)
+
+- **v4.7.4** - Smaller court cards; Check-In button now "✓-In"
+
+- **v4.7.3** - All queue timers use SVG clock; A-Z buttons fit one line
+
+- **v4.7.2** - Right-aligned court timers; unified SVG clock icon across pool/queue/courts
+
+- **v4.7.1** - Court timer: SVG clock icon + smaller font
+
+- **v4.7.0** - Refined slate theme + Inter/JetBrains Mono typography
+
+- **v4.6.1** - Password-gate Clear History/Remove Duplicates/Clear All; remove CSV format panel; fix search icon centering
+
+- **v4.6.0** - Mono minimal theme: warm charcoal, flat fills, gender dots, cyan sole accent
+
+- **v4.5.3** - start-cuemii.bat no longer hangs on fingerprint service failure
+
+- **v4.5.2** - Baddixx logo icon + desktop shortcut helper for the launcher
+
+- **v4.5.1** - Sync Now updates enrollments.json regardless of reader status
+
+- **v4.5.0** - Manual reconnect button on the reader status pill
+
+- **v4.4.8** - start-cuemii.bat: reverted service-wait backstop to ~60s
+
+- **v4.4.7** - start-cuemii.bat launches the app even if the fingerprint service fails to start
+
+- **v4.4.6** - Fingerprint reader auto-recovers after USB reconnect or sleep/wake
+
+- **v4.4.5** - Manage Players: A-Z buttons vertically centered with search box
+
+- **v4.4.4** - Manage Players: A-Z buttons beside search, removed Search label
+
+- **v4.4.3** - Header logo blends with background (transparent PNG)
+
+- **v4.4.2** - Reset All Data and Reset FP now require a password
+
+- **v4.4.1** - Deleting a player also removes their fingerprint (no more re-adding by scan)
+
+- **v4.4.0** - Add a new player directly from the fingerprint assign dialog
+
+- **v4.3.7** - Fixed start-cuemii.bat path error (start /D instead of nested cd)
+
+- **v4.3.6** - Added start-cuemii.bat launcher (frees port 9001, starts service then app)
 
 - **v4.3.5** - Sortable Status/Fingerprint columns; uppercase Name/Gender/Level headers
 

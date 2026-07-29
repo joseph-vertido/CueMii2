@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import AlertDialog from './components/AlertDialog';
+import { showAlert, showConfirm, showPrompt } from './utils/appAlert';
 import { initialPlayers, initialCourts } from './data/initialData';
 import useCurrentTime from './hooks/useCurrentTime';
 import useLocalStorage from './hooks/useLocalStorage';
@@ -28,6 +30,18 @@ import {
 /**
  * Main Baddixx Queuing System Application
  */
+// Password required to run destructive resets (Reset All Data, Reset FP).
+const RESET_PASSWORD = '0067006700';
+const requireResetPassword = async () => {
+  const pw = await showPrompt('Enter password to continue:', { password: true });
+  if (pw === null) return false; // cancelled
+  if (pw !== RESET_PASSWORD) {
+    showAlert('Incorrect password.');
+    return false;
+  }
+  return true;
+};
+
 function App() {
   // License State
   const [licenseInfo, setLicenseInfo] = useState(null);
@@ -36,7 +50,12 @@ function App() {
   const [isCheckingLicense, setIsCheckingLicense] = useState(true);
 
   // Theme State
-  const [isDarkMode, setIsDarkMode] = useLocalStorage('baddixx_darkMode', true);
+  // Theme: 'light' | 'dark' | 'neon'. Neon is a dark variant, so isDarkMode
+  // stays true for it and every component's existing dark styling applies;
+  // the neon look is layered on top via CSS scoped to the .neon class.
+  const [theme, setTheme] = useLocalStorage('baddixx_theme', 'dark');
+  const isDarkMode = theme !== 'light';
+  const cycleTheme = () => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'neon' : 'light');
   
   // Persistent State (saved to localStorage)
   const [players, setPlayers] = useLocalStorage('baddixx_players', initialPlayers);
@@ -267,8 +286,9 @@ function App() {
 
   // ==================== Reset Function ====================
   
-  const resetAllData = () => {
-    if (window.confirm('Are you sure you want to reset all session data?\n\nThis will clear:\n• Player Pool (Available & Not Present)\n• All Matches\n• Courts\n\nMatch History and Player Database will be preserved.')) {
+  const resetAllData = async () => {
+    if (!(await requireResetPassword())) return;
+    if (await showConfirm('Are you sure you want to reset all session data?\n\nThis will clear:\n• Player Pool (Available & Not Present)\n• All Matches\n• Courts\n\nMatch History and Player Database will be preserved.')) {
       // Clear all persisted data except player database and match history
       setPoolPlayers([]);
       setNotPresentPlayers([]);
@@ -311,7 +331,8 @@ function App() {
 
   // ==================== Clear Match History ====================
   
-  const clearMatchHistory = () => {
+  const clearMatchHistory = async () => {
+    if (!(await requireResetPassword())) return;
     setMatchHistory([]);
   };
 
@@ -319,6 +340,14 @@ function App() {
   
   const addPlayer = (player) => {
     setPlayers(prev => [...prev, player]);
+  };
+
+  // Add a player and return the new id (used by the fingerprint assign dialog
+  // so it can immediately enroll the finger to the freshly created player).
+  const addPlayerReturningId = (player) => {
+    const id = Date.now();
+    setPlayers(prev => [...prev, { ...player, id }]);
+    return id;
   };
 
   const importPlayers = (newPlayers, newFingerprints = {}) => {
@@ -393,10 +422,16 @@ function App() {
   const deletePlayer = (playerId) => {
     setPlayers(prev => prev.filter(p => p.id !== playerId));
     setPoolPlayers(prev => prev.filter(p => p.id !== playerId));
+    setNotPresentPlayers(prev => prev.filter(p => p.id !== playerId));
     setMatches(prev => prev.map(m => ({
       ...m,
       players: m.players.filter(p => p.id !== playerId)
     })));
+    // Also remove their fingerprint (from local, the matching service, and
+    // Firebase) so a deleted player can't be re-added by scanning their finger.
+    if (fingerprints[playerId] || fingerprints[String(playerId)]) {
+      deletePlayerFingerprint(playerId);
+    }
   };
 
   // ==================== Pool Functions ====================
@@ -535,7 +570,8 @@ function App() {
   };
 
   // Reset (clear) ALL fingerprints from the database.
-  const resetAllFingerprints = () => {
+  const resetAllFingerprints = async () => {
+    if (!(await requireResetPassword())) return;
     const empty = {};
     setFingerprints(empty);
     replaceEnrollments(empty);
@@ -549,6 +585,7 @@ function App() {
   // then authoritatively rewrite the cloud and local list so each player exists
   // exactly once. Works even when the local list is empty (it pulls the cloud).
   const removeDuplicatePlayers = async () => {
+    if (!(await requireResetPassword())) return;
     let pool = [...players];
     if (isFirebaseConfigured && cloudSyncEnabled) {
       try {
@@ -618,6 +655,9 @@ function App() {
         const merged = { ...cloudMap, ...fingerprints }; // union; local wins on conflict
         setFingerprints(merged);
         await syncFingerprintsToCloud(merged);
+        // Write the merged templates into the service's enrollments.json now,
+        // regardless of the reader's current status (listening or not).
+        await importEnrollments(merged);
       } catch (err) {
         console.warn('Fingerprint manual sync failed:', err.message);
       }
@@ -626,11 +666,11 @@ function App() {
   };
 
   // Move player from Available back to Not Present (with warning)
-  const moveToNotPresent = (playerId) => {
+  const moveToNotPresent = async (playerId) => {
     const player = poolPlayers.find(p => p.id === playerId);
     if (!player) return;
     
-    if (!window.confirm(`Move ${player.name} back to "Not Present"?\n\nTheir idle time and game count will be reset.`)) {
+    if (!await showConfirm(`Move ${player.name} back to "Not Present"?\n\nTheir idle time and game count will be reset.`)) {
       return;
     }
     
@@ -789,18 +829,31 @@ function App() {
     }));
   };
 
-  const addPlayerToMatch = (matchId, player) => {
+  const addPlayerToMatch = async (matchId, player) => {
     const match = matches.find(m => m.id === matchId);
     if (!match || match.players.length >= 4 || match.players.find(p => p.id === player.id)) {
       return;
     }
     
-    // Check if the next available slot is reserved for someone else
+    // Check if the next open position is reserved for someone else.
+    // A reservation holds a SEAT in the match, not a fixed position: players
+    // are stored in a dense array, so the next person always lands at
+    // players.length. If that position is reserved but there are still free
+    // seats left over, let this player take the position and move the
+    // reservation(s) along, so the reserved player keeps a guaranteed seat.
     const nextSlotIndex = match.players.length;
-    const reservation = matchReservations[matchId]?.[nextSlotIndex];
+    const matchRes = matchReservations[matchId] || {};
+    const reservation = matchRes[nextSlotIndex];
+    let shiftReservationsFrom = null;
     if (reservation && reservation.id !== player.id) {
-      alert(`This slot is reserved for: ${reservation.name}`);
-      return;
+      const pendingReservations = Object.keys(matchRes)
+        .filter(slotIndex => Number(slotIndex) >= nextSlotIndex).length;
+      const freeSeats = 4 - match.players.length - pendingReservations;
+      if (freeSeats <= 0) {
+        showAlert(`The remaining slots are reserved (next: ${reservation.name}).`);
+        return;
+      }
+      shiftReservationsFrom = nextSlotIndex;
     }
     
     // Get today's date for filtering
@@ -896,7 +949,7 @@ function App() {
     
     // Show novice alert if any issues detected
     if (noviceAlertMessages.length > 0) {
-      const proceed = window.confirm(
+      const proceed = await showConfirm(
         `⚠️ NOVICE OVER-MATCHING ⚠️\n\n${noviceAlertMessages.join('\n\n')}\n\nDo you still want to add ${player.name} to this match?`
       );
       if (!proceed) return;
@@ -904,7 +957,7 @@ function App() {
     
     // Show repeat pairings alert if any issues detected
     if (repeatAlertMessages.length > 0) {
-      const proceed = window.confirm(
+      const proceed = await showConfirm(
         `⚠️ REPEAT PAIRINGS ⚠️\n\n${repeatAlertMessages.join('\n\n')}\n\nDo you still want to add ${player.name} to this match?`
       );
       if (!proceed) return;
@@ -920,6 +973,21 @@ function App() {
       
       return updatedMatches;
     });
+    
+    // Move reservations one position later, since this player took the
+    // position they were sitting on.
+    if (shiftReservationsFrom !== null) {
+      setMatchReservations(prev => {
+        const forMatch = prev[matchId];
+        if (!forMatch) return prev;
+        const shifted = {};
+        Object.entries(forMatch).forEach(([slotIndex, reservedPlayer]) => {
+          const i = Number(slotIndex);
+          shifted[i >= shiftReservationsFrom ? i + 1 : i] = reservedPlayer;
+        });
+        return { ...prev, [matchId]: shifted };
+      });
+    }
     
     // Clear any reservation for this player in this match
     clearReservationForPlayer(matchId, player.id);
@@ -965,10 +1033,29 @@ function App() {
     });
   };
 
-  const movePlayerBetweenMatches = (sourceMatchId, targetMatchId, player) => {
+  const movePlayerBetweenMatches = async (sourceMatchId, targetMatchId, player) => {
     const targetMatch = matches.find(m => m.id === targetMatchId);
     if (!targetMatch || targetMatch.players.length >= 4) {
       return;
+    }
+    
+    // Respect reservations in the target match. Same rule as adding from the
+    // pool: a reservation holds a seat, so this player may take the next
+    // position (moving the reservation along) only while free seats remain.
+    // If every remaining seat is reserved, only the reserved player may go in.
+    const nextSlotIndex = targetMatch.players.length;
+    const targetRes = matchReservations[targetMatchId] || {};
+    const reservation = targetRes[nextSlotIndex];
+    let shiftReservationsFrom = null;
+    if (reservation && reservation.id !== player.id) {
+      const pendingReservations = Object.keys(targetRes)
+        .filter(slotIndex => Number(slotIndex) >= nextSlotIndex).length;
+      const freeSeats = 4 - targetMatch.players.length - pendingReservations;
+      if (freeSeats <= 0) {
+        showAlert(`The remaining slots are reserved (next: ${reservation.name}).`);
+        return;
+      }
+      shiftReservationsFrom = nextSlotIndex;
     }
     
     // Get today's date for filtering
@@ -1064,7 +1151,7 @@ function App() {
     
     // Show novice alert if any issues detected
     if (noviceAlertMessages.length > 0) {
-      const proceed = window.confirm(
+      const proceed = await showConfirm(
         `⚠️ NOVICE OVER-MATCHING ⚠️\n\n${noviceAlertMessages.join('\n\n')}\n\nDo you still want to move ${player.name} to this match?`
       );
       if (!proceed) return;
@@ -1072,7 +1159,7 @@ function App() {
     
     // Show repeat pairings alert if any issues detected
     if (repeatAlertMessages.length > 0) {
-      const proceed = window.confirm(
+      const proceed = await showConfirm(
         `⚠️ REPEAT PAIRINGS ⚠️\n\n${repeatAlertMessages.join('\n\n')}\n\nDo you still want to move ${player.name} to this match?`
       );
       if (!proceed) return;
@@ -1091,6 +1178,24 @@ function App() {
       }
       return m;
     }));
+    
+    // Move reservations one position later if this player took the position
+    // they were sitting on.
+    if (shiftReservationsFrom !== null) {
+      setMatchReservations(prev => {
+        const forMatch = prev[targetMatchId];
+        if (!forMatch) return prev;
+        const shifted = {};
+        Object.entries(forMatch).forEach(([slotIndex, reservedPlayer]) => {
+          const i = Number(slotIndex);
+          shifted[i >= shiftReservationsFrom ? i + 1 : i] = reservedPlayer;
+        });
+        return { ...prev, [targetMatchId]: shifted };
+      });
+    }
+    
+    // If the moved player was the one reserved here, that reservation is done.
+    clearReservationForPlayer(targetMatchId, player.id);
   };
 
   const clearMatch = (matchId) => {
@@ -1113,7 +1218,8 @@ function App() {
   };
 
   // Clear all players from all matches
-  const clearAllMatches = () => {
+  const clearAllMatches = async () => {
+    if (!(await requireResetPassword())) return;
     setMatches(prev => prev.map(m => ({ ...m, players: [] })));
     setLastSmartMatch(null);
     setLastSmartQueueAll(null);
@@ -1144,14 +1250,14 @@ function App() {
     // If moving up and would become position 0 (top) and current has reservations, show error
     if (direction === 'up' && targetSortedIndex === 0 && currentHasReservations) {
       const reservedNames = Object.values(currentMatchReservations).map(p => p.name).join(', ');
-      alert(`Cannot move to top of queue.\n\nThis match is waiting for: ${reservedNames}\n\nFill all reserved slots first.`);
+      showAlert(`Cannot move to top of queue.\n\nThis match is waiting for: ${reservedNames}\n\nFill all reserved slots first.`);
       return;
     }
     
     // If moving down from position 0 and target has reservations, show error (target would become top)
     if (direction === 'down' && sortedIndex === 0 && targetHasReservations) {
       const reservedNames = Object.values(targetMatchReservations).map(p => p.name).join(', ');
-      alert(`Cannot swap - the match below is waiting for: ${reservedNames}\n\nIt cannot be moved to top of queue until all reserved slots are filled.`);
+      showAlert(`Cannot swap - the match below is waiting for: ${reservedNames}\n\nIt cannot be moved to top of queue until all reserved slots are filled.`);
       return;
     }
     
@@ -1218,18 +1324,24 @@ function App() {
     if (!match) return;
 
     const currentPlayers = match.players;
-    const neededPlayers = 4 - currentPlayers.length;
+    // Slots held by a pending reservation (index at/after the current fill
+    // point) must be left free for the reserved player.
+    const reservedPendingSlots = Object.keys(matchReservations[matchId] || {})
+      .filter(slotIndex => Number(slotIndex) >= currentPlayers.length).length;
+    const neededPlayers = 4 - currentPlayers.length - reservedPendingSlots;
     
     // Track failure reasons
     let failureReasons = [];
     
     if (neededPlayers <= 0) {
-      alert('⚠️ Smart Match Failed\n\nMatch is already full (4 players).');
+      showAlert(currentPlayers.length >= 4
+        ? '⚠️ Smart Match Failed\n\nMatch is already full (4 players).'
+        : '⚠️ Smart Match Failed\n\nThe remaining slots are reserved for specific players.');
       return;
     }
     
     if (availablePlayers.length === 0) {
-      alert('⚠️ Smart Match Failed\n\nNo available players in the pool.');
+      showAlert('⚠️ Smart Match Failed\n\nNo available players in the pool.');
       return;
     }
 
@@ -1585,7 +1697,7 @@ function App() {
           ? uniqueReasons.slice(0, 5).join('\n• ')
           : 'No additional eligible players found';
         
-        alert(
+        showAlert(
           `ℹ️ Smart Match: Partial Fill\n\n` +
           `Mode: ${finalModeLabel}\n` +
           `Added ${selectedPlayers.length} player${selectedPlayers.length !== 1 ? 's' : ''} ` +
@@ -1600,7 +1712,7 @@ function App() {
         ? uniqueReasons.slice(0, 5).join('\n• ')
         : 'No eligible players found';
       
-      alert(
+      showAlert(
         `⚠️ Smart Match Could Not Add Any Players\n\n` +
         `Tried: ${initialMode === 'mixed' ? 'Mixed (2M/2F)' : `Regular (4${initialMode === 'male' ? 'M' : 'F'}) → Mixed`}\n\n` +
         `Reasons:\n• ${reasonsList}\n\n` +
@@ -1653,6 +1765,18 @@ function App() {
       return match.players.length + addedToMatch;
     };
     
+    // Slots reserved for a specific player (at/after the current fill point)
+    // must not be auto-filled.
+    const getReservedPendingCount = (match, currentCount) =>
+      Object.keys(matchReservations[match.id] || {})
+        .filter(slotIndex => Number(slotIndex) >= currentCount).length;
+    
+    // How many slots Smart All may actually fill for this match.
+    const getFillableCapacity = (match) => {
+      const count = getMatchPlayerCount(match);
+      return 4 - count - getReservedPendingCount(match, count);
+    };
+    
     // Keep processing until no more available players or all matches complete
     let continueProcessing = true;
     let iterations = 0;
@@ -1673,7 +1797,7 @@ function App() {
       
       // Get incomplete matches (considering players added this session)
       const sortedMatches = [...localMatches].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
-      let incompleteMatches = sortedMatches.filter(m => getMatchPlayerCount(m) < 4);
+      let incompleteMatches = sortedMatches.filter(m => getFillableCapacity(m) > 0);
       
       // If no incomplete matches but still have players, create a new match
       if (incompleteMatches.length === 0 && availablePlayers.length > 0) {
@@ -1706,7 +1830,8 @@ function App() {
           .filter(Boolean);
         
         const currentPlayers = [...match.players, ...alreadyAddedToMatch];
-        const neededPlayers = 4 - currentPlayers.length;
+        const neededPlayers = 4 - currentPlayers.length
+          - getReservedPendingCount(match, currentPlayers.length);
         
         if (neededPlayers <= 0) continue;
         
@@ -2032,7 +2157,7 @@ function App() {
       // Check for duplicate name (case-insensitive)
       const isDuplicate = courts.some(c => c.name.toLowerCase() === trimmedName.toLowerCase());
       if (isDuplicate) {
-        alert(`A court named "${trimmedName}" already exists.`);
+        showAlert(`A court named "${trimmedName}" already exists.`);
         return;
       }
       setCourts(prev => [...prev, { id: Date.now(), name: trimmedName, match: null, startTime: null }]);
@@ -2040,13 +2165,13 @@ function App() {
     }
   };
 
-  const deleteCourt = (courtId) => {
+  const deleteCourt = async (courtId) => {
     const court = courts.find(c => c.id === courtId);
     const confirmMessage = court && court.match 
       ? `Are you sure you want to delete "${court.name}"? There is an active match on this court - the players will be returned to the pool.`
       : `Are you sure you want to delete "${court?.name || 'this court'}"?`;
     
-    if (!window.confirm(confirmMessage)) return;
+    if (!await showConfirm(confirmMessage)) return;
     
     setCourts(prev => {
       const courtToDelete = prev.find(c => c.id === courtId);
@@ -2085,7 +2210,7 @@ function App() {
       // Check for duplicate name (case-insensitive), excluding the current court
       const isDuplicate = courts.some(c => c.id !== courtId && c.name.toLowerCase() === trimmedName.toLowerCase());
       if (isDuplicate) {
-        alert(`A court named "${trimmedName}" already exists.`);
+        showAlert(`A court named "${trimmedName}" already exists.`);
         return;
       }
       setCourts(prev => prev.map(c => c.id === courtId ? { ...c, name: trimmedName } : c));
@@ -2094,7 +2219,7 @@ function App() {
     setEditingCourtName('');
   };
 
-  const moveMatchToCourt = (matchId, courtId) => {
+  const moveMatchToCourt = async (matchId, courtId) => {
     // Get the match first before we modify state
     const matchToMove = matches.find(m => m.id === matchId);
     if (!matchToMove || matchToMove.players.length === 0) return;
@@ -2109,7 +2234,7 @@ function App() {
       const preferredNames = matchToMove.preferredCourts
         .map(cId => courts.find(c => c.id === cId)?.name || 'Unknown')
         .join(', ');
-      const confirmed = window.confirm(
+      const confirmed = await showConfirm(
         `⚠️ Non-Preferred Court Warning\n\n` +
         `Match #${matchToMove.matchNumber} is waiting for: ${preferredNames}\n\n` +
         `You are assigning them to "${targetCourt.name}" which is not in their preferred list.\n\n` +
@@ -2133,7 +2258,7 @@ function App() {
           return `• Match #${m.matchNumber}: ${playerNames}`;
         }).join('\n');
         
-        const confirmed = window.confirm(
+        const confirmed = await showConfirm(
           `⚠️ Players Waiting for This Court\n\n` +
           `The following matches are waiting for "${targetCourt.name}":\n\n` +
           `${waitingInfo}\n\n` +
@@ -2158,16 +2283,14 @@ function App() {
       });
       
       if (eligibleLowerMatches.length > 0) {
-        const eligibleInfo = eligibleLowerMatches.map(m => {
-          const playerNames = m.players.map(p => p.name).join(', ');
-          return `• Match #${m.matchNumber}: ${playerNames}`;
-        }).join('\n');
+        const eligibleInfo = eligibleLowerMatches
+          .map(m => `Match #${m.matchNumber}`)
+          .join('\n');
         
-        const confirmed = window.confirm(
-          `⚠️ Higher Priority Match Available\n\n` +
-          `The following matches are higher in the queue and can also be assigned to "${targetCourt.name}":\n\n` +
+        const confirmed = await showConfirm(
+          `The following matches are higher in priority:\n\n` +
           `${eligibleInfo}\n\n` +
-          `Do you want to skip them and assign Match #${matchToMove.matchNumber} instead?`
+          `Are you sure you want to skip them?`
         );
         if (!confirmed) {
           // Highlight eligible matches for 10 seconds
@@ -2547,6 +2670,52 @@ function App() {
     });
   };
 
+  // Keep reservations pinned to the free seats at the end of each match.
+  // Players are stored in a dense list, so after players are added (including
+  // by Smart Match / Smart All) a reservation's slot index can end up sitting
+  // on an occupied position — which would hide the "Waiting for ..." marker
+  // and let someone else take the seat. Re-key them to the free tail, drop any
+  // whose player is already in the match, and drop any that no longer fit.
+  useEffect(() => {
+    setMatchReservations(prev => {
+      let changed = false;
+      const next = {};
+
+      Object.entries(prev).forEach(([matchId, slots]) => {
+        const match = matches.find(m => String(m.id) === String(matchId));
+        if (!match) {
+          // Match is gone; drop its reservations.
+          changed = true;
+          return;
+        }
+
+        const inMatch = new Set(match.players.map(p => p.id));
+        let kept = Object.entries(slots)
+          .sort((a, b) => Number(a[0]) - Number(b[0]))
+          .filter(([, reserved]) => !inMatch.has(reserved.id));
+
+        if (kept.length !== Object.keys(slots).length) changed = true;
+
+        // Any reservation on an occupied position => re-key them all.
+        if (kept.some(([slotIndex]) => Number(slotIndex) < match.players.length)) {
+          kept = kept.map(([, reserved], n) => [String(match.players.length + n), reserved]);
+          changed = true;
+        }
+
+        const rekeyed = {};
+        kept.forEach(([slotIndex, reserved]) => {
+          if (Number(slotIndex) <= 3) rekeyed[slotIndex] = reserved;
+          else changed = true;
+        });
+
+        if (Object.keys(rekeyed).length > 0) next[matchId] = rekeyed;
+        else changed = true;
+      });
+
+      return changed ? next : prev;
+    });
+  }, [matches, setMatchReservations]);
+
   // ==================== Derived State ====================
   
   const selectedMatch = matches.find(m => m.id === selectedMatchId);
@@ -2555,15 +2724,15 @@ function App() {
   
   // Theme classes
   const themeClasses = isDarkMode 
-    ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white'
-    : 'bg-gradient-to-br from-slate-100 via-white to-slate-100 text-slate-900';
+    ? 'bg-slate-950 text-white'
+    : 'bg-slate-100 text-slate-900';
 
   // Show loading state while checking license
   if (isCheckingLicense) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg mx-auto mb-4">
+          <div className="w-16 h-16 bg-cyan-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <span className="text-3xl">🏸</span>
           </div>
           <p className="text-slate-400">Loading...</p>
@@ -2583,11 +2752,18 @@ function App() {
   }
   
   return (
-    <div className={`min-h-screen ${themeClasses}`}>
+    <div className={`min-h-screen ${isDarkMode ? 'dark' : ''} ${theme === 'neon' ? 'neon' : ''} ${themeClasses}`}>
       {/* Background Pattern */}
       <div className={`fixed inset-0 ${isDarkMode ? 'opacity-5' : 'opacity-[0.02]'} bg-pattern`} />
 
+      {/* Ambient aurora wash (dark mode only) */}
+      {isDarkMode && <div className="aurora-bg" aria-hidden="true" />}
+
+      {/* Centred in-app alerts (replaces browser alert popups) */}
+      <AlertDialog isDarkMode={isDarkMode} />
+
       {/* Header */}
+      <div className="relative">
       <Header 
         onOpenDatabase={() => setIsDbModalOpen(true)} 
         onOpenHistory={() => setIsHistoryModalOpen(true)}
@@ -2596,12 +2772,14 @@ function App() {
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onResetData={resetAllData}
         isDarkMode={isDarkMode}
-        toggleTheme={() => setIsDarkMode(!isDarkMode)}
+        theme={theme}
+        toggleTheme={cycleTheme}
         licenseInfo={licenseInfo}
         syncStatus={syncStatus}
         isOnline={isOnline}
         cloudSyncEnabled={cloudSyncEnabled}
       />
+      </div>
 
       {/* Main Content */}
       <main className="relative max-w-[1920px] mx-auto p-6">
@@ -2811,6 +2989,7 @@ function App() {
         onCheckIn={checkInPlayerById}
         onEnroll={handleFingerprintEnroll}
         onServiceEnrollments={handleServiceEnrollments}
+        onAddPlayer={addPlayerReturningId}
         enabled={true}
         isDarkMode={isDarkMode}
       />

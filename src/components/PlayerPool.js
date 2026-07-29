@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { showConfirm } from '../utils/appAlert';
 import { SKILL_LEVELS } from '../data/initialData';
 import { formatWaitTime, getWaitTimeColor, getWaitTimeColorLight } from '../utils/formatters';
 import LevelBadge from './LevelBadge';
-import GenderIcon from './GenderIcon';
+import ThemedSelect from './ThemedSelect';
 
 /**
  * Player pool section displaying all players waiting to be matched
@@ -80,21 +81,39 @@ const PlayerPool = ({
     }
   }, [poolSearch, playersInQueue.length, playersOnCourt.length]);
 
-  // Clear search on mouseup outside search input
+  // Clear search on mouseup outside search input, or when a drag finishes.
+  // HTML5 drag-and-drop suppresses mouseup, so 'dragend' is needed for the
+  // drag case (dragging a card out of a filtered list should reset the search).
   useEffect(() => {
     const handleMouseUp = (e) => {
       if (searchInputRef.current && !searchInputRef.current.contains(e.target)) {
-        setPoolSearch('');
+        // Deferred: clearing the search re-renders (and re-filters) the list.
+        // Doing that synchronously on mouseup would move or unmount the card
+        // before the browser dispatches the following 'click', so button
+        // clicks (e.g. the ✕ remove button) would be lost or hit the wrong row.
+        setTimeout(() => setPoolSearch(''), 0);
       }
     };
 
+    const handleDragEnd = () => setPoolSearch('');
+    // A successful drop can unmount the dragged card before 'dragend' reaches
+    // the document, so listen for the drop too (capture phase, deferred so the
+    // drop is fully processed first).
+    const handleDrop = () => setTimeout(() => setPoolSearch(''), 0);
+
     document.addEventListener('mouseup', handleMouseUp);
-    return () => document.removeEventListener('mouseup', handleMouseUp);
+    document.addEventListener('dragend', handleDragEnd);
+    document.addEventListener('drop', handleDrop, true);
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('dragend', handleDragEnd);
+      document.removeEventListener('drop', handleDrop, true);
+    };
   }, [setPoolSearch]);
 
   // Handle Clear Timers with confirmation
-  const handleClearTimers = () => {
-    if (window.confirm('Are you sure you want to clear all player idle times? This will reset everyone\'s wait time to now.')) {
+  const handleClearTimers = async () => {
+    if (await showConfirm('Are you sure you want to clear all player idle times? This will reset everyone\'s wait time to now.')) {
       clearIdleTimes();
     }
   };
@@ -149,13 +168,13 @@ const PlayerPool = ({
   };
 
   // Player card component for Available/In Match sections
-  // Get pulsing glow class based on wait time (only for players waiting 10+ minutes)
+  // Get pulsing glow class based on wait time (only for players waiting 5+ minutes)
   const getWaitGlowClass = (joinedAt) => {
     if (!joinedAt) return '';
     const diff = Math.floor((Date.now() - joinedAt) / 1000 / 60);
-    if (diff < 10) return '';
-    if (diff < 25) return 'animate-pulse-glow-green';
-    if (diff < 40) return 'animate-pulse-glow-yellow';
+    if (diff < 5) return '';
+    if (diff < 10) return 'animate-pulse-glow-green';
+    if (diff < 15) return 'animate-pulse-glow-yellow';
     return 'animate-pulse-glow-red';
   };
 
@@ -166,7 +185,7 @@ const PlayerPool = ({
     <div
       draggable={!inMatch}
       onDragStart={(e) => !inMatch && handleDragStart(e, player, 'pool')}
-      className={`group rounded-lg p-2 border transition-all ${glowClass} ${
+      className={`pool-card group rounded-lg p-2 border transition-all ${glowClass} ${
         isDarkMode 
           ? `bg-slate-800/50 ${inMatch ? 'border-yellow-500/30 opacity-70' : 'border-slate-700/50 hover:border-cyan-500/50'}` 
           : `bg-white shadow-sm ${inMatch ? 'border-yellow-500 opacity-70' : 'border-slate-300 hover:border-cyan-600 hover:shadow-md'}`
@@ -174,13 +193,12 @@ const PlayerPool = ({
     >
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5 min-w-0">
-          <GenderIcon gender={player.gender} />
-          <span className={`font-medium text-sm truncate ${player.gender === 'male' ? (isDarkMode ? 'text-blue-400' : 'text-blue-700') : (isDarkMode ? 'text-pink-400' : 'text-pink-700')}`}>{player.name}</span>
+          <span className={`font-normal text-sm truncate ${player.gender === 'male' ? (isDarkMode ? 'text-blue-300' : 'text-blue-700') : (isDarkMode ? 'text-pink-300' : 'text-pink-700')}`}>{player.name}</span>
         </div>
         {!inMatch && (
           <button
             onClick={() => removeFromPool(player.id)}
-            className={`p-0.5 rounded transition-all flex-shrink-0 ${
+            className={`p-0.5 rounded transition-all flex-shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 ${
               isDarkMode 
                 ? 'text-red-400 hover:text-red-300 hover:bg-red-500/20' 
                 : 'text-red-600 hover:text-red-700 hover:bg-red-100'
@@ -196,10 +214,13 @@ const PlayerPool = ({
       <div className="flex items-center justify-between gap-1">
         <LevelBadge level={player.level} isDarkMode={isDarkMode} />
         <div className="flex items-center gap-2 text-xs">
-          <span className={`${isDarkMode ? getWaitTimeColor(player.joinedAt) : getWaitTimeColorLight(player.joinedAt)}`} title="Wait time">
-            ⏱{formatWaitTime(player.joinedAt)}
+          <span className={`inline-flex items-center gap-0.5 leading-none tabular ${isDarkMode ? getWaitTimeColor(player.joinedAt) : getWaitTimeColorLight(player.joinedAt)}`} title="Wait time">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {formatWaitTime(player.joinedAt)}
           </span>
-          <span className={`${isDarkMode ? 'text-emerald-500' : 'text-emerald-700'}`} title="Games played">
+          <span className={`inline-flex items-center gap-0.5 leading-none ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`} title="Games played">
             🏸{player.playCount || 0}
           </span>
         </div>
@@ -224,14 +245,14 @@ const PlayerPool = ({
     <div
       draggable={true}
       onDragStart={(e) => handleDragStart(e, player, 'notPresent')}
-      className={`group rounded-lg px-2 py-1.5 border transition-all cursor-grab active:cursor-grabbing ${
+      className={`pool-card group rounded-lg px-2 py-1.5 border transition-all cursor-grab active:cursor-grabbing ${
         isDarkMode 
           ? 'bg-slate-800/30 border-red-500/30 hover:border-red-500/50' 
           : 'bg-red-50/30 border-red-300/50 hover:border-red-400 shadow-sm'
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={`font-medium text-sm truncate flex-1 ${
+        <span className={`font-normal text-sm truncate flex-1 ${
           isDarkMode ? 'text-slate-200' : 'text-slate-700'
         }`}>{player.name}</span>
         <button
@@ -242,7 +263,7 @@ const PlayerPool = ({
               : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-300'
           }`}
         >
-          Check-In
+          ✓-In
         </button>
         <button
           onClick={() => removeFromPool(player.id)}
@@ -277,23 +298,23 @@ const PlayerPool = ({
 
   return (
     <section 
-      className={`backdrop-blur-sm rounded-2xl border overflow-hidden h-full flex flex-col shadow-sm ${
+      className={`backdrop-blur-sm rounded-2xl border overflow-hidden h-full flex flex-col panel-depth ${
         isDarkMode 
           ? 'bg-slate-900/50 border-slate-700/50' 
           : 'bg-white border-slate-300'
       }`}
     >
-      <div className={`bg-gradient-to-r border-b px-4 py-3 ${
+      <div className={`border-b px-4 py-3 ${
         isDarkMode 
-          ? 'from-cyan-600/20 to-teal-600/20 border-slate-700/50' 
-          : 'from-slate-100 to-slate-200 border-slate-300'
+          ? 'bg-slate-800/60 border-slate-700/50' 
+          : 'bg-slate-100 border-slate-300'
       }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              isDarkMode ? 'bg-cyan-500/20' : 'bg-slate-300'
+              isDarkMode ? 'bg-cyan-500/20' : 'bg-cyan-100'
             }`}>
-              <svg className={`w-5 h-5 ${isDarkMode ? 'text-cyan-500' : 'text-slate-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-5 h-5 ${isDarkMode ? 'text-cyan-500' : 'text-cyan-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
             </div>
@@ -322,8 +343,8 @@ const PlayerPool = ({
         
         {/* Search and Filter */}
         <div className="mt-2 flex gap-2">
-          <div className="flex-1 relative">
-            <svg className={`w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex-1 min-w-0 relative">
+            <svg className={`w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -338,9 +359,9 @@ const PlayerPool = ({
                 }
               }}
               placeholder="Search..."
-              className={`w-full border rounded pl-7 pr-7 py-1 text-sm focus:outline-none transition-colors ${
+              className={`w-full border rounded-full pl-8 pr-7 py-1 text-sm focus:outline-none transition-colors ${
                 isDarkMode 
-                  ? 'bg-slate-800/50 border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500' 
+                  ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500' 
                   : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-cyan-400'
               }`}
             />
@@ -356,20 +377,17 @@ const PlayerPool = ({
               </button>
             )}
           </div>
-          <select
+          <ThemedSelect
+            className="w-32 flex-none"
             value={poolLevelFilter}
             onChange={(e) => setPoolLevelFilter(e.target.value)}
-            className={`border rounded px-2 py-1 text-sm focus:outline-none transition-colors ${
-              isDarkMode 
-                ? 'bg-slate-800/50 border-slate-600 text-white focus:border-cyan-500' 
-                : 'bg-white border-slate-300 text-slate-800 focus:border-cyan-400'
-            }`}
+            isDarkMode={isDarkMode}
           >
             <option value="All">All Levels</option>
             {SKILL_LEVELS.map(level => (
               <option key={level} value={level}>{level}</option>
             ))}
-          </select>
+          </ThemedSelect>
         </div>
       </div>
       
@@ -400,8 +418,9 @@ const PlayerPool = ({
                 <h3 className={`text-sm font-semibold uppercase tracking-wider ${
                   isDarkMode ? 'text-blue-400' : 'text-blue-600'
                 }`}>
-                  Available ({availablePlayers.length})
+                  Available
                 </h3>
+                <span className={`count-pill text-[11px] px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-cyan-500/15 text-cyan-300' : 'bg-cyan-100 text-cyan-700'}`}>{availablePlayers.length}</span>
               </div>
               {availablePlayers.length === 0 ? (
                 <div className={`text-center py-4 text-sm rounded-lg ${
@@ -436,8 +455,9 @@ const PlayerPool = ({
                 <h3 className={`text-sm font-semibold uppercase tracking-wider ${
                   isDarkMode ? 'text-red-400' : 'text-red-500'
                 }`}>
-                  Not Present ({filteredNotPresent.length})
+                  Not Present
                 </h3>
+                <span className={`count-pill text-[11px] px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-red-500/15 text-red-300' : 'bg-red-100 text-red-600'}`}>{filteredNotPresent.length}</span>
               </div>
               {filteredNotPresent.length === 0 ? (
                 <div className={`text-center py-4 text-sm rounded-lg ${
@@ -479,8 +499,9 @@ const PlayerPool = ({
                     <h3 className={`text-sm font-semibold uppercase tracking-wider ${
                       isDarkMode ? 'text-yellow-500' : 'text-yellow-600'
                     }`}>
-                      In Match Queue ({playersInQueue.length})
+                      In Match Queue
                     </h3>
+                    <span className={`count-pill text-[11px] px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-yellow-500/15 text-yellow-300' : 'bg-yellow-100 text-yellow-700'}`}>{playersInQueue.length}</span>
                   </div>
                   <svg 
                     className={`w-4 h-4 transition-transform ${inQueueCollapsed ? '' : 'rotate-180'} ${
@@ -517,8 +538,9 @@ const PlayerPool = ({
                     <h3 className={`text-sm font-semibold uppercase tracking-wider ${
                       isDarkMode ? 'text-emerald-500' : 'text-emerald-600'
                     }`}>
-                      In Court ({playersOnCourt.length})
+                      In Court
                     </h3>
+                    <span className={`count-pill text-[11px] px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>{playersOnCourt.length}</span>
                   </div>
                   <svg 
                     className={`w-4 h-4 transition-transform ${onCourtCollapsed ? '' : 'rotate-180'} ${

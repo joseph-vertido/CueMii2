@@ -111,26 +111,26 @@ const CourtsPanel = ({
   // Get court status based on elapsed time
   const getCourtStatus = (startTime) => {
     const minutes = getElapsedMinutes(startTime);
-    if (minutes >= 35) return 'red';
+    if (minutes >= 30) return 'red';
     if (minutes >= 20) return 'yellow';
     return 'normal';
   };
 
   return (
-    <section className={`backdrop-blur-sm rounded-2xl border overflow-hidden h-full flex flex-col shadow-sm ${
+    <section className={`backdrop-blur-sm rounded-2xl border overflow-hidden h-full flex flex-col panel-depth ${
       isDarkMode ? 'bg-slate-900/50 border-slate-700/50' : 'bg-white border-slate-300'
     }`}>
-      <div className={`bg-gradient-to-r border-b px-3 py-2 ${
+      <div className={`border-b px-3 py-2 ${
         isDarkMode 
-          ? 'from-emerald-600/20 to-green-600/20 border-slate-700/50' 
-          : 'from-slate-100 to-slate-200 border-slate-300'
+          ? 'bg-slate-800/60 border-slate-700/50' 
+          : 'bg-slate-100 border-slate-300'
       }`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <div className={`w-6 h-6 rounded flex items-center justify-center ${
-              isDarkMode ? 'bg-emerald-500/20' : 'bg-slate-300'
+              isDarkMode ? 'bg-cyan-500/20' : 'bg-cyan-100'
             }`}>
-              <svg className={`w-4 h-4 ${isDarkMode ? 'text-emerald-500' : 'text-slate-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-4 h-4 ${isDarkMode ? 'text-cyan-500' : 'text-cyan-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
@@ -148,15 +148,15 @@ const CourtsPanel = ({
             placeholder="New court..."
             className={`flex-1 border rounded px-2 py-1 focus:outline-none transition-colors text-xs ${
               isDarkMode 
-                ? 'bg-slate-800/50 border-slate-600 text-white placeholder-slate-500 focus:border-emerald-500' 
-                : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-emerald-500'
+                ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500' 
+                : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-cyan-500'
             }`}
             onKeyPress={(e) => e.key === 'Enter' && addCourt()}
           />
           <button
             onClick={addCourt}
             disabled={!newCourtName.trim()}
-            className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-400 disabled:cursor-not-allowed px-2 py-1 rounded font-semibold transition-colors text-xs text-white"
+            className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-400 disabled:cursor-not-allowed px-2 py-1 rounded font-semibold transition-colors text-xs text-white"
           >
             +
           </button>
@@ -205,54 +205,68 @@ const CourtsPanel = ({
               // Normal status (under 20 min) - green timer
               cardClass = isDarkMode ? 'bg-slate-800/50 border-slate-600' : 'bg-slate-50 border-slate-300';
               headerClass = isDarkMode ? 'border-slate-700/30' : 'border-slate-200';
-              timerClass = isDarkMode ? 'text-emerald-400' : 'text-emerald-600';
+              timerClass = isDarkMode ? 'text-cyan-400' : 'text-cyan-600';
             } else {
               cardClass = isDarkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-300';
               headerClass = isDarkMode ? 'border-slate-700/30' : 'border-slate-200';
               timerClass = '';
             }
             
-            // Add pulsating highlight for newly assigned courts
+            // Add pulsating highlight for newly assigned courts.
+            // '!' forces the yellow border to win over the status border color.
             const newlyAssignedClass = isNewlyAssigned 
-              ? 'ring-2 ring-yellow-400 animate-pulse-border' 
+              ? `animate-pulse-border ${isDarkMode ? '' : '!border-yellow-500'}` 
               : '';
             
             return (
             <div
               key={court.id}
               ref={(el) => courtRefs.current[court.id] = el}
-              className={`rounded border overflow-hidden ${cardClass} ${newlyAssignedClass}`}
+              className={`rounded border overflow-hidden card-depth ${cardClass} ${newlyAssignedClass}`}
             >
+              {/* Status strip: cyan = live, amber = running long, red = overdue */}
+              <div className={`court-strip h-[3px] ${
+                isNewlyAssigned ? 'bg-cyan-500 animate-strip-assigned' :
+                courtStatus === 'red' ? 'bg-red-500' :
+                courtStatus === 'yellow' ? 'bg-amber-500' :
+                court.match ? 'bg-cyan-500' : (isDarkMode ? 'bg-slate-700/60' : 'bg-slate-300')
+              }`} />
               {/* Court Header - Single line */}
-              <div className={`px-2 py-1.5 flex items-center justify-between border-b ${headerClass}`}>
+              <div className={`px-2 py-1.5 flex items-center justify-between gap-2 border-b ${headerClass}`}>
                 {editingCourtId === court.id ? (
-                  <div className="flex items-center gap-1 flex-1">
+                  <div className="flex items-center gap-1 flex-1 min-w-0">
                     <input
                       type="text"
                       value={editingCourtName}
                       onChange={(e) => setEditingCourtName(e.target.value)}
-                      className={`flex-1 border rounded px-1 py-0.5 text-xs ${
+                      className={`flex-1 min-w-0 border rounded px-1 py-0.5 text-xs ${
                         isDarkMode 
-                          ? 'bg-slate-900 border-emerald-500 text-white' 
-                          : 'bg-white border-emerald-500 text-slate-800'
+                          ? 'bg-slate-900 border-cyan-500 text-white' 
+                          : 'bg-white border-cyan-500 text-slate-800'
                       }`}
                       autoFocus
                       onKeyPress={(e) => e.key === 'Enter' && renameCourt(court.id, editingCourtName)}
                     />
-                    <button onClick={() => renameCourt(court.id, editingCourtName)} className={`text-xs ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>✓</button>
-                    <button onClick={() => { setEditingCourtId(null); setEditingCourtName(''); }} className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>✕</button>
+                    <button onClick={() => renameCourt(court.id, editingCourtName)} className={`text-xs flex-shrink-0 ${isDarkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>✓</button>
+                    <button onClick={() => { setEditingCourtId(null); setEditingCourtName(''); }} className={`text-xs flex-shrink-0 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>✕</button>
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center gap-1.5">
-                      <div className={`w-2 h-2 rounded-full ${
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        isNewlyAssigned ? 'bg-cyan-500 animate-pulse-dot-assigned' :
                         courtStatus === 'red' ? 'bg-red-500' :
                         courtStatus === 'yellow' ? 'bg-amber-500' :
-                        court.match ? 'bg-emerald-500' : (isDarkMode ? 'bg-slate-600' : 'bg-slate-400')
+                        court.match ? 'bg-cyan-500' : (isDarkMode ? 'bg-slate-600' : 'bg-slate-400')
                       }`} />
-                      <span className={`font-semibold text-sm ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{court.name}</span>
+                      <span className={`font-medium text-sm uppercase ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{court.name}</span>
                       {court.match && (
-                        <span className={`text-sm font-medium ${timerClass}`}>⏱{formatCourtTime(court.startTime, currentTime)}</span>
+                        <span className={`neon-timer text-xs font-medium tabular inline-flex items-center gap-0.5 ml-auto ${timerClass}`}>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {formatCourtTime(court.startTime, currentTime)}
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-0.5">
@@ -286,12 +300,12 @@ const CourtsPanel = ({
                       <div
                         key={player.id}
                         className={`rounded px-2 py-1 flex items-center justify-between h-7 border ${
-                          isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-300'
+                          isDarkMode ? 'bg-slate-900/70 border-slate-700' : 'bg-white border-slate-300'
                         }`}
                       >
-                        <span className={`text-sm font-medium truncate ${
-                          player.gender === 'male' 
-                            ? (isDarkMode ? 'text-blue-300' : 'text-blue-700') 
+                        <span className={`text-sm font-normal truncate ${
+                          player.gender === 'male'
+                            ? (isDarkMode ? 'text-blue-300' : 'text-blue-700')
                             : (isDarkMode ? 'text-pink-300' : 'text-pink-700')
                         }`}>{formatName(player)}</span>
                       </div>
@@ -302,26 +316,26 @@ const CourtsPanel = ({
                   <div className="flex gap-1">
                     <button
                       onClick={() => returnMatchToQueue(court.id)}
-                      className={`w-1/5 h-6 rounded text-xs font-medium flex items-center justify-center ${
+                      className={`w-1/5 h-5 rounded text-[11px] font-medium flex items-center justify-center ${
                         isDarkMode 
                           ? 'bg-amber-600 hover:bg-amber-500 text-white' 
                           : 'bg-amber-500 hover:bg-amber-400 text-white'
                       }`}
                       title="Return to queue"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                      <svg className="w-3 h-3 -scale-y-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                       </svg>
                     </button>
                     <button
                       onClick={() => endMatch(court.id)}
-                      className={`flex-1 h-6 rounded text-xs font-medium flex items-center justify-center gap-1 ${
+                      className={`flex-1 h-5 rounded text-[11px] font-medium flex items-center justify-center gap-1 ${
                         isDarkMode 
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
-                          : 'bg-emerald-500 hover:bg-emerald-400 text-white'
+                          ? 'bg-cyan-600 hover:bg-cyan-500 text-white' 
+                          : 'bg-cyan-500 hover:bg-cyan-400 text-white'
                       }`}
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                       </svg>
                       Done
@@ -337,7 +351,7 @@ const CourtsPanel = ({
                         key={index}
                         className={`rounded px-2 py-1 h-7 flex items-center border border-dashed ${
                           isDarkMode 
-                            ? 'bg-slate-800/30 border-slate-700/50' 
+                            ? 'bg-slate-900/50 border-slate-700/50' 
                             : 'bg-slate-100 border-slate-300'
                         }`}
                       >
