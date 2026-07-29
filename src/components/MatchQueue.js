@@ -657,8 +657,26 @@ const MatchQueue = ({
                   
                   {/* Players - All 4 in a single horizontal line, each player single line */}
                   <div className="flex gap-1 mb-2">
-                    {[0, 1, 2, 3].map(index => {
-                      const player = match.players[index];
+                    {(() => {
+                      // Lay the four slots out so a RESERVED slot keeps its
+                      // position and players flow around it. match.players is a
+                      // dense list, so a player's index in that list isn't the
+                      // slot they're shown in.
+                      const reserved = matchReservations[match.id] || {};
+                      const layout = [null, null, null, null];
+                      Object.entries(reserved).forEach(([slotIndex, resPlayer]) => {
+                        const i = Number(slotIndex);
+                        if (i >= 0 && i < 4) layout[i] = { reservedFor: resPlayer };
+                      });
+                      let nextPlayer = 0;
+                      for (let i = 0; i < 4; i++) {
+                        if (!layout[i] && nextPlayer < match.players.length) {
+                          layout[i] = { player: match.players[nextPlayer++] };
+                        }
+                      }
+                      return layout;
+                    })().map((slot, index) => {
+                      const player = slot?.player;
                       const isRecentSmart = player && isRecentlySmartMatched(player.id);
                       return (
                         <div

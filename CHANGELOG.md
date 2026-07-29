@@ -14,6 +14,27 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.15.1] - 2026-07-17
+
+### Changed
+- Player pool cards: a little more space between the player's name and the level
+  badge row beneath it.
+
+## [4.15.0] - 2026-07-17
+
+### Changed
+- **A reserved slot now stays put when other players are added.** Dropping a
+  player into a match no longer pushes the "Waiting for ..." marker to the
+  right — the new player goes into the next slot that isn't reserved, and the
+  reservation keeps the position it was made on.
+  - The queue now lays the four slots out by placing reservations at their own
+    slot and flowing players around them, so a player's position in the match
+    list no longer dictates which slot they appear in.
+  - When the reserved player finally joins, they land on their reserved slot
+    rather than at the end of the row.
+  - Adding and moving players, Smart Match and Smart All all count reservations
+    the same way, and still refuse once every free slot is spoken for.
+
 ## [4.14.3] - 2026-07-17
 
 ### Fixed

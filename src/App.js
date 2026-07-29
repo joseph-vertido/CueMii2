@@ -835,25 +835,16 @@ function App() {
       return;
     }
     
-    // Check if the next open position is reserved for someone else.
-    // A reservation holds a SEAT in the match, not a fixed position: players
-    // are stored in a dense array, so the next person always lands at
-    // players.length. If that position is reserved but there are still free
-    // seats left over, let this player take the position and move the
-    // reservation(s) along, so the reserved player keeps a guaranteed seat.
-    const nextSlotIndex = match.players.length;
+    // Reservations hold their own slot; this player simply takes the next slot
+    // that isn't reserved (the queue lays the slots out that way). All we need
+    // to check is that a free, unreserved seat actually exists.
     const matchRes = matchReservations[matchId] || {};
-    const reservation = matchRes[nextSlotIndex];
-    let shiftReservationsFrom = null;
-    if (reservation && reservation.id !== player.id) {
-      const pendingReservations = Object.keys(matchRes)
-        .filter(slotIndex => Number(slotIndex) >= nextSlotIndex).length;
-      const freeSeats = 4 - match.players.length - pendingReservations;
-      if (freeSeats <= 0) {
-        showAlert(`The remaining slots are reserved (next: ${reservation.name}).`);
-        return;
-      }
-      shiftReservationsFrom = nextSlotIndex;
+    const heldForOthers = Object.values(matchRes)
+      .filter(r => r.id !== player.id && !match.players.some(p => p.id === r.id)).length;
+    if (match.players.length + heldForOthers >= 4) {
+      const nextName = Object.values(matchRes).find(r => r.id !== player.id)?.name;
+      showAlert(`The remaining slots are reserved${nextName ? ` (next: ${nextName})` : ''}.`);
+      return;
     }
     
     // Get today's date for filtering
@@ -966,7 +957,10 @@ function App() {
     setMatches(prev => {
       const updatedMatches = prev.map(m => {
         if (m.id === matchId && m.players.length < 4 && !m.players.find(p => p.id === player.id)) {
-          return { ...m, players: [...m.players, player] };
+          const at = insertIndexForReservation(matchId, m.players, player.id);
+          const next = [...m.players];
+          next.splice(at, 0, player);
+          return { ...m, players: next };
         }
         return m;
       });
@@ -974,23 +968,22 @@ function App() {
       return updatedMatches;
     });
     
-    // Move reservations one position later, since this player took the
-    // position they were sitting on.
-    if (shiftReservationsFrom !== null) {
-      setMatchReservations(prev => {
-        const forMatch = prev[matchId];
-        if (!forMatch) return prev;
-        const shifted = {};
-        Object.entries(forMatch).forEach(([slotIndex, reservedPlayer]) => {
-          const i = Number(slotIndex);
-          shifted[i >= shiftReservationsFrom ? i + 1 : i] = reservedPlayer;
-        });
-        return { ...prev, [matchId]: shifted };
-      });
-    }
     
     // Clear any reservation for this player in this match
     clearReservationForPlayer(matchId, player.id);
+  };
+
+  // When a player who holds a reservation joins, put them in the array position
+  // that lands them on their reserved slot, so they appear exactly where the
+  // "Waiting for ..." marker was rather than at the end of the row.
+  const insertIndexForReservation = (matchId, players, playerId) => {
+    const slots = matchReservations[matchId] || {};
+    const mine = Object.entries(slots).find(([, r]) => r.id === playerId);
+    if (!mine) return players.length;
+    const reservedIndex = Number(mine[0]);
+    const othersBefore = Object.entries(slots)
+      .filter(([i, r]) => Number(i) < reservedIndex && r.id !== playerId).length;
+    return Math.min(Math.max(reservedIndex - othersBefore, 0), players.length);
   };
 
   const removePlayerFromMatch = (matchId, playerId) => {
@@ -1039,23 +1032,15 @@ function App() {
       return;
     }
     
-    // Respect reservations in the target match. Same rule as adding from the
-    // pool: a reservation holds a seat, so this player may take the next
-    // position (moving the reservation along) only while free seats remain.
-    // If every remaining seat is reserved, only the reserved player may go in.
-    const nextSlotIndex = targetMatch.players.length;
+    // Reservations in the target match hold their own slot; this player takes
+    // the next unreserved slot, so we only need a free seat to exist.
     const targetRes = matchReservations[targetMatchId] || {};
-    const reservation = targetRes[nextSlotIndex];
-    let shiftReservationsFrom = null;
-    if (reservation && reservation.id !== player.id) {
-      const pendingReservations = Object.keys(targetRes)
-        .filter(slotIndex => Number(slotIndex) >= nextSlotIndex).length;
-      const freeSeats = 4 - targetMatch.players.length - pendingReservations;
-      if (freeSeats <= 0) {
-        showAlert(`The remaining slots are reserved (next: ${reservation.name}).`);
-        return;
-      }
-      shiftReservationsFrom = nextSlotIndex;
+    const heldForOthers = Object.values(targetRes)
+      .filter(r => r.id !== player.id && !targetMatch.players.some(p => p.id === r.id)).length;
+    if (targetMatch.players.length + heldForOthers >= 4) {
+      const nextName = Object.values(targetRes).find(r => r.id !== player.id)?.name;
+      showAlert(`The remaining slots are reserved${nextName ? ` (next: ${nextName})` : ''}.`);
+      return;
     }
     
     // Get today's date for filtering
@@ -1174,25 +1159,14 @@ function App() {
         // Add to target match (with pool player data)
         const poolPlayer = poolPlayers.find(p => p.id === player.id);
         const playerToAdd = poolPlayer || player;
-        return { ...m, players: [...m.players, playerToAdd] };
+        const at = insertIndexForReservation(targetMatchId, m.players, playerToAdd.id);
+        const next = [...m.players];
+        next.splice(at, 0, playerToAdd);
+        return { ...m, players: next };
       }
       return m;
     }));
     
-    // Move reservations one position later if this player took the position
-    // they were sitting on.
-    if (shiftReservationsFrom !== null) {
-      setMatchReservations(prev => {
-        const forMatch = prev[targetMatchId];
-        if (!forMatch) return prev;
-        const shifted = {};
-        Object.entries(forMatch).forEach(([slotIndex, reservedPlayer]) => {
-          const i = Number(slotIndex);
-          shifted[i >= shiftReservationsFrom ? i + 1 : i] = reservedPlayer;
-        });
-        return { ...prev, [targetMatchId]: shifted };
-      });
-    }
     
     // If the moved player was the one reserved here, that reservation is done.
     clearReservationForPlayer(targetMatchId, player.id);
@@ -1326,8 +1300,8 @@ function App() {
     const currentPlayers = match.players;
     // Slots held by a pending reservation (index at/after the current fill
     // point) must be left free for the reserved player.
-    const reservedPendingSlots = Object.keys(matchReservations[matchId] || {})
-      .filter(slotIndex => Number(slotIndex) >= currentPlayers.length).length;
+    const reservedPendingSlots = Object.values(matchReservations[matchId] || {})
+      .filter(r => !currentPlayers.some(p => p.id === r.id)).length;
     const neededPlayers = 4 - currentPlayers.length - reservedPendingSlots;
     
     // Track failure reasons
@@ -1765,16 +1739,15 @@ function App() {
       return match.players.length + addedToMatch;
     };
     
-    // Slots reserved for a specific player (at/after the current fill point)
-    // must not be auto-filled.
-    const getReservedPendingCount = (match, currentCount) =>
-      Object.keys(matchReservations[match.id] || {})
-        .filter(slotIndex => Number(slotIndex) >= currentCount).length;
+    // Slots held for a specific player must not be auto-filled.
+    const getReservedPendingCount = (match) =>
+      Object.values(matchReservations[match.id] || {})
+        .filter(r => !match.players.some(p => p.id === r.id)).length;
     
     // How many slots Smart All may actually fill for this match.
     const getFillableCapacity = (match) => {
       const count = getMatchPlayerCount(match);
-      return 4 - count - getReservedPendingCount(match, count);
+      return 4 - count - getReservedPendingCount(match);
     };
     
     // Keep processing until no more available players or all matches complete
@@ -1830,8 +1803,7 @@ function App() {
           .filter(Boolean);
         
         const currentPlayers = [...match.players, ...alreadyAddedToMatch];
-        const neededPlayers = 4 - currentPlayers.length
-          - getReservedPendingCount(match, currentPlayers.length);
+        const neededPlayers = 4 - currentPlayers.length - getReservedPendingCount(match);
         
         if (neededPlayers <= 0) continue;
         
@@ -2670,12 +2642,11 @@ function App() {
     });
   };
 
-  // Keep reservations pinned to the free seats at the end of each match.
-  // Players are stored in a dense list, so after players are added (including
-  // by Smart Match / Smart All) a reservation's slot index can end up sitting
-  // on an occupied position — which would hide the "Waiting for ..." marker
-  // and let someone else take the seat. Re-key them to the free tail, drop any
-  // whose player is already in the match, and drop any that no longer fit.
+  // Tidy reservations after any match change. Reservations keep whichever slot
+  // they were made on (the queue lays players out around them), so this only
+  // drops ones that no longer make sense: the reserved player has since joined
+  // the match, the match is gone, or there are more reservations than free
+  // seats.
   useEffect(() => {
     setMatchReservations(prev => {
       let changed = false;
@@ -2683,33 +2654,26 @@ function App() {
 
       Object.entries(prev).forEach(([matchId, slots]) => {
         const match = matches.find(m => String(m.id) === String(matchId));
-        if (!match) {
-          // Match is gone; drop its reservations.
-          changed = true;
-          return;
-        }
+        if (!match) { changed = true; return; }
 
         const inMatch = new Set(match.players.map(p => p.id));
-        let kept = Object.entries(slots)
+        const kept = {};
+        let seatsLeft = 4 - match.players.length;
+
+        Object.entries(slots)
           .sort((a, b) => Number(a[0]) - Number(b[0]))
-          .filter(([, reserved]) => !inMatch.has(reserved.id));
+          .forEach(([slotIndex, reserved]) => {
+            const i = Number(slotIndex);
+            if (inMatch.has(reserved.id) || i < 0 || i > 3 || seatsLeft <= 0) {
+              changed = true;
+              return;
+            }
+            kept[slotIndex] = reserved;
+            seatsLeft -= 1;
+          });
 
-        if (kept.length !== Object.keys(slots).length) changed = true;
-
-        // Any reservation on an occupied position => re-key them all.
-        if (kept.some(([slotIndex]) => Number(slotIndex) < match.players.length)) {
-          kept = kept.map(([, reserved], n) => [String(match.players.length + n), reserved]);
-          changed = true;
-        }
-
-        const rekeyed = {};
-        kept.forEach(([slotIndex, reserved]) => {
-          if (Number(slotIndex) <= 3) rekeyed[slotIndex] = reserved;
-          else changed = true;
-        });
-
-        if (Object.keys(rekeyed).length > 0) next[matchId] = rekeyed;
-        else changed = true;
+        if (Object.keys(kept).length > 0) next[matchId] = kept;
+        else if (Object.keys(slots).length > 0) changed = true;
       });
 
       return changed ? next : prev;

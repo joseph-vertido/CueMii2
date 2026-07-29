@@ -191,7 +191,7 @@ const PlayerPool = ({
           : `bg-white shadow-sm ${inMatch ? 'border-yellow-500 opacity-70' : 'border-slate-300 hover:border-cyan-600 hover:shadow-md'}`
       } ${!inMatch ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className={`font-normal text-sm truncate ${player.gender === 'male' ? (isDarkMode ? 'text-blue-300' : 'text-blue-700') : (isDarkMode ? 'text-pink-300' : 'text-pink-700')}`}>{player.name}</span>
         </div>

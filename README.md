@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 4.14.3**
+**Version 4.15.1**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -252,6 +252,10 @@ and compares it to the running `APP_VERSION`. Once a bumped version is pushed to
 > below is retained for legacy history.
 
 ## Version History
+
+- **v4.15.1** - Slightly more space between name and level in pool cards
+
+- **v4.15.0** - Reserved slots hold their position; new players fill around them
 
 - **v4.14.3** - Fixed update.bat writing to the wrong folder
 
