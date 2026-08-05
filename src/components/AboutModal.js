@@ -181,8 +181,8 @@ const AboutModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`neon-panel rounded-2xl border w-full max-w-xl shadow-2xl ${
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className={`neon-panel rounded-2xl border w-full max-w-xl shadow-2xl ${
         isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
       }`}>
         {/* Header */}
@@ -190,15 +190,10 @@ const AboutModal = ({
           isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
         }`}>
           <div className="flex items-center gap-3">
-            <img src="/banner.png" alt="BADDIXX" className="h-9 w-auto" />
-            <div>
-              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                CueMii
-              </h2>
-              <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Version {APP_VERSION}
-              </p>
-            </div>
+            <img src="/cuemii-logo.png" alt="CueMii" className="h-10 w-auto object-contain" />
+            <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Version {APP_VERSION}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -309,7 +304,7 @@ const AboutModal = ({
                   <div className="flex justify-between">
                     <span className={isDarkMode ? 'text-slate-400' : 'text-slate-600'}>Days Remaining:</span>
                     <span className={`font-semibold ${
-                      daysLeft <= 7 ? (isDarkMode ? 'text-red-400' : 'text-red-600') : daysLeft <= 30 ? (isDarkMode ? 'text-amber-400' : 'text-amber-600') : (isDarkMode ? 'text-emerald-400' : 'text-emerald-700')
+                      daysLeft < 15 ? (isDarkMode ? 'text-red-400' : 'text-red-600') : daysLeft <= 30 ? (isDarkMode ? 'text-amber-400' : 'text-amber-600') : (isDarkMode ? 'text-emerald-400' : 'text-emerald-700')
                     }`}>
                       {daysLeft}
                     </span>

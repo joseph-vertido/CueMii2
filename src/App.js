@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import AlertDialog from './components/AlertDialog';
+import { flyPlayerToMatch, flyPlayersToMatch, flyMatchToCourt, flyPlayersToCourt, flyPlayersToPool, flyPlayerGroup, animateCardSwap } from './utils/flyAnimation';
+import { skipNextFlip } from './hooks/useFlipList';
 import { showAlert, showConfirm, showPrompt } from './utils/appAlert';
 import { initialPlayers, initialCourts } from './data/initialData';
 import useCurrentTime from './hooks/useCurrentTime';
@@ -30,7 +32,7 @@ import {
 /**
  * Main Baddixx Queuing System Application
  */
-// Password required to run destructive resets (Reset All Data, Reset FP).
+// Password required to run destructive resets (Reset Day, Reset FP).
 const RESET_PASSWORD = '0067006700';
 const requireResetPassword = async () => {
   const pw = await showPrompt('Enter password to continue:', { password: true });
@@ -107,6 +109,11 @@ function App() {
   const [highlightedPriorityMatches, setHighlightedPriorityMatches] = useState({}); // Track matches highlighted for priority: { matchId: timestamp }
   const [lastEndedMatch, setLastEndedMatch] = useState(null); // For undo end match: { courtId, courtName, match, startTime, previousPoolPlayers, previousMatchHistory }
   const [scrollToCourtId, setScrollToCourtId] = useState(null); // For auto-scrolling to court when match is assigned
+  const [scrollToMatchId, setScrollToMatchId] = useState(null); // Bring a match into view before players return to it
+
+  // The last group to leave each court, so a match returned and then sent
+  // straight back can resume its timer rather than starting from zero.
+  const lastCourtOccupancy = useRef({});
   
   // Panel resize state
   const [panelWidths, setPanelWidths] = useLocalStorage('baddixx_panelWidths', {
@@ -270,25 +277,31 @@ function App() {
       return;
     }
     
-    // If last match has at least 1 player, create a new empty match
+    // If last match has at least 1 player, create a new empty match.
+    // Held back until the player's card has finished flying in, so the new
+    // match doesn't appear underneath an animation still in progress.
     const lastMatch = matches[matches.length - 1];
     if (lastMatch && lastMatch.players && lastMatch.players.length > 0) {
-      const newMatch = {
-        id: `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        matchNumber: nextMatchNumber,
-        players: [],
-        createdAt: Date.now()
-      };
-      setMatches(prev => [...prev, newMatch]);
-      setNextMatchNumber(prev => prev + 1);
+      const timer = setTimeout(() => {
+        const newMatch = {
+          id: `match_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          matchNumber: nextMatchNumber,
+          players: [],
+          createdAt: Date.now()
+        };
+        setMatches(prev => [...prev, newMatch]);
+        setNextMatchNumber(prev => prev + 1);
+      }, 820);
+      return () => clearTimeout(timer);
     }
+    return undefined;
   }, [matches]);
 
   // ==================== Reset Function ====================
   
   const resetAllData = async () => {
     if (!(await requireResetPassword())) return;
-    if (await showConfirm('Are you sure you want to reset all session data?\n\nThis will clear:\n• Player Pool (Available & Not Present)\n• All Matches\n• Courts\n\nMatch History and Player Database will be preserved.')) {
+    if (await showConfirm('Are you sure you want to reset the day?\n\nThis will clear:\n• Player Pool (Available & Not Present)\n• All Matches\n• Courts\n\nMatch History and Player Database will be preserved.')) {
       // Clear all persisted data except player database and match history
       setPoolPlayers([]);
       setNotPresentPlayers([]);
@@ -310,6 +323,16 @@ function App() {
 
   // ==================== Clear Idle Times ====================
   
+  // Asks first, then resets everyone's wait time. Previously the confirmation
+  // lived in the player pool alongside the button; the action moved to the
+  // header menu, so the prompt came with it.
+  const confirmClearIdleTimes = async () => {
+    if (!(await requireResetPassword())) return;
+    if (await showConfirm("Are you sure you want to clear all player idle times? This will reset everyone's wait time to now.")) {
+      clearIdleTimes();
+    }
+  };
+
   const clearIdleTimes = () => {
     const now = Date.now();
     // Reset joinedAt for all pool players to current time
@@ -458,7 +481,49 @@ function App() {
   };
 
   // Move player from Not Present to Available (starts their timer)
+  // Add a database player straight into the Available group, skipping the
+  // Not Present step that addToPool goes through.
+  const addToAvailable = (player) => {
+    if (poolPlayers.find(p => p.id === player.id)) return;
+    setNotPresentPlayers(prev => prev.filter(p => p.id !== player.id));
+    setPoolPlayers(prev => ([...prev, {
+      ...player,
+      joinedAt: Date.now(),
+      playCount: player.playCount || 0,
+      noviceMatchCount: player.noviceMatchCount || 0,
+      lastNoviceMatchAt: player.lastNoviceMatchAt || 0,
+      lastAdvancedMatchAt: player.lastAdvancedMatchAt || 0,
+      pairedNovices: player.pairedNovices || [],
+      pairedAdvanced: player.pairedAdvanced || [],
+      intermediateNoviceCount: player.intermediateNoviceCount || 0,
+      lastIntermediateNoviceMatchAt: player.lastIntermediateNoviceMatchAt || 0,
+      pairedNovicesAsIntermediate: player.pairedNovicesAsIntermediate || []
+    }]));
+  };
+
+  // Drop a Not Present or database player straight onto a match: they join the
+  // Available group first, then go into the match.
+  const addExternalPlayerToMatch = async (matchId, player) => {
+    addToAvailable(player);
+    await addPlayerToMatch(matchId, {
+      ...player,
+      joinedAt: player.joinedAt || Date.now(),
+      playCount: player.playCount || 0
+    });
+  };
+
   const moveToAvailable = (playerId) => {
+    // Their card flies from the Not Present list up into Available
+    const arriving = notPresentPlayers.find(p => p.id === playerId);
+    if (arriving) {
+      flyPlayerGroup(
+        [arriving],
+        `[data-player-card="${playerId}"]`,
+        (p) => `[data-player-card="${p.id}"]`,
+        isDarkMode
+      );
+    }
+
     const player = notPresentPlayers.find(p => p.id === playerId);
     if (!player) return;
     
@@ -673,6 +738,14 @@ function App() {
     if (!await showConfirm(`Move ${player.name} back to "Not Present"?\n\nTheir idle time and game count will be reset.`)) {
       return;
     }
+
+    // Their card flies from Available down into the Not Present list
+    flyPlayerGroup(
+      [player],
+      `[data-player-card="${playerId}"]`,
+      (p) => `[data-player-card="${p.id}"]`,
+      isDarkMode
+    );
     
     setPoolPlayers(prev => prev.filter(p => p.id !== playerId));
     setNotPresentPlayers(prev => [...prev, {
@@ -737,6 +810,7 @@ function App() {
   const deleteMatch = (matchId) => {
     // Save match to history before deleting
     const matchToDelete = matches.find(m => m.id === matchId);
+    flyMatchPlayersHome(matchId, matchToDelete?.players);
     if (matchToDelete) {
       setMatchHistory(prev => [...prev, {
         ...matchToDelete,
@@ -969,6 +1043,8 @@ function App() {
     });
     
     
+    flyPlayerToMatch(player, matchId, isDarkMode);
+
     // Clear any reservation for this player in this match
     clearReservationForPlayer(matchId, player.id);
   };
@@ -987,6 +1063,17 @@ function App() {
   };
 
   const removePlayerFromMatch = (matchId, playerId) => {
+    // The player's card flies from its slot in the queue back to the pool
+    const leaving = matches.find(m => m.id === matchId)?.players?.find(p => p.id === playerId);
+    if (leaving) {
+      flyPlayerGroup(
+        [leaving],
+        `[data-match-card="${matchId}"]`,
+        (p) => `[data-player-card="${p.id}"]`,
+        isDarkMode
+      );
+    }
+
     setMatches(prev => prev.map(m => {
       if (m.id === matchId) {
         return { ...m, players: m.players.filter(p => p.id !== playerId) };
@@ -1002,6 +1089,14 @@ function App() {
     
     const player = match.players.find(p => p.id === playerId);
     if (!player) return;
+
+    // Their card flies from the match slot down to the Not Present list
+    flyPlayerGroup(
+      [player],
+      `[data-match-card="${matchId}"]`,
+      (p) => `[data-player-card="${p.id}"]`,
+      isDarkMode
+    );
     
     // Remove from match
     setMatches(prev => prev.map(m => {
@@ -1168,11 +1263,26 @@ function App() {
     }));
     
     
+    flyPlayerToMatch(player, targetMatchId, isDarkMode);
+
     // If the moved player was the one reserved here, that reservation is done.
     clearReservationForPlayer(targetMatchId, player.id);
   };
 
+  // Players leaving a match head back to their card in the pool.
+  const flyMatchPlayersHome = (matchId, players) => {
+    if (!players?.length) return;
+    flyPlayerGroup(
+      players,
+      `[data-match-card="${matchId}"]`,
+      (p) => `[data-player-card="${p.id}"]`,
+      isDarkMode
+    );
+  };
+
   const clearMatch = (matchId) => {
+    flyMatchPlayersHome(matchId, matches.find(m => m.id === matchId)?.players);
+
     setMatches(prev => prev.map(m => {
       if (m.id === matchId) {
         return { ...m, players: [] };
@@ -1193,7 +1303,7 @@ function App() {
 
   // Clear all players from all matches
   const clearAllMatches = async () => {
-    if (!(await requireResetPassword())) return;
+    matches.forEach(m => flyMatchPlayersHome(m.id, m.players));
     setMatches(prev => prev.map(m => ({ ...m, players: [] })));
     setLastSmartMatch(null);
     setLastSmartQueueAll(null);
@@ -1212,6 +1322,15 @@ function App() {
     
     const currentMatch = sortedMatches[sortedIndex];
     const targetMatch = sortedMatches[targetSortedIndex];
+
+    // Moving a match up or down swaps the PLAYERS between the two cards rather
+    // than moving the cards, so nothing would appear to move. Start each card at
+    // the other's position and slide it home, so the real cards are seen
+    // exchanging places.
+    animateCardSwap(
+      `[data-match-card="${currentMatch.id}"]`,
+      `[data-match-card="${targetMatch.id}"]`
+    );
     
     // Check if current match has reservations
     const currentMatchReservations = matchReservations[currentMatch.id];
@@ -1238,11 +1357,23 @@ function App() {
     // Swap players between the two matches
     setMatches(prev => {
       return prev.map(m => {
+        // The court preferences and the smart-match highlight belong to the
+        // players, so they travel with them rather than staying with the card.
         if (m.id === currentMatch.id) {
-          return { ...m, players: targetMatch.players };
+          return {
+            ...m,
+            players: targetMatch.players,
+            preferredCourts: targetMatch.preferredCourts,
+            smartMatchedPlayerIds: targetMatch.smartMatchedPlayerIds,
+          };
         }
         if (m.id === targetMatch.id) {
-          return { ...m, players: currentMatch.players };
+          return {
+            ...m,
+            players: currentMatch.players,
+            preferredCourts: currentMatch.preferredCourts,
+            smartMatchedPlayerIds: currentMatch.smartMatchedPlayerIds,
+          };
         }
         return m;
       });
@@ -1507,28 +1638,25 @@ function App() {
     
     // Determine target gender mode
     if (currentPlayers.length === 0) {
-      // Empty match - decide mode (60% regular, 40% mixed)
-      // But if the longest-waiting player is an Expert, force Regular Doubles
+      // Empty match: the two longest-waiting players decide the format, so
+      // neither can be passed over for the sake of completing a set. Same
+      // gender gives regular doubles; different gives mixed. A partly filled
+      // match is preferred to skipping someone who has waited longer.
       const longestWaiting = sortedPlayers[0];
-      const isLongestWaitingExpert = longestWaiting && longestWaiting.level === 'Expert';
-      
-      const isMixed = !isLongestWaitingExpert && Math.random() < 0.40;
-      if (isMixed) {
+      const secondLongest = sortedPlayers.find(p => p.id !== longestWaiting?.id);
+
+      if (!longestWaiting) {
         targetGenderMode = 'mixed';
+      } else if (longestWaiting.level === 'Expert') {
+        // Experts are excluded from the mixed fallback, so keep them in a
+        // format they can actually be placed in.
+        targetGenderMode = longestWaiting.gender;
+      } else if (!secondLongest) {
+        targetGenderMode = longestWaiting.gender;
       } else {
-        // Regular doubles - pick gender based on who has waited longest
-        const longestWaitMale = sortedPlayers.find(p => p.gender === 'male');
-        const longestWaitFemale = sortedPlayers.find(p => p.gender === 'female');
-        
-        if (longestWaitMale && longestWaitFemale) {
-          targetGenderMode = longestWaitMale.joinedAt <= longestWaitFemale.joinedAt ? 'male' : 'female';
-        } else if (longestWaitMale) {
-          targetGenderMode = 'male';
-        } else if (longestWaitFemale) {
-          targetGenderMode = 'female';
-        } else {
-          targetGenderMode = 'mixed'; // Fallback
-        }
+        targetGenderMode = secondLongest.gender === longestWaiting.gender
+          ? longestWaiting.gender
+          : 'mixed';
       }
     } else if (currentMales > 0 && currentFemales > 0) {
       // Already mixed - must continue as 2M/2F
@@ -1549,7 +1677,9 @@ function App() {
     const hasAdvancedMaleInMatch = currentPlayers.some(p => p.level === 'Advanced' && p.gender === 'male');
     
     let playersToConsider = [...sortedPlayers];
-    if (targetGenderMode === 'male' || hasAdvancedMaleInMatch) {
+    // Only once the match has players — on an empty match, wait time alone
+    // decides the order.
+    if (currentPlayers.length > 0 && (targetGenderMode === 'male' || hasAdvancedMaleInMatch)) {
       // Sort to prefer Advanced males first, then by wait time
       playersToConsider.sort((a, b) => {
         const aIsAdvancedMale = a.level === 'Advanced' && a.gender === 'male';
@@ -1638,6 +1768,10 @@ function App() {
         timestamp: Date.now()
       });
       
+      // Each smart-matched player flies from the pool into the match, staggered
+      // slightly so four at once reads as a sequence rather than a blur.
+      flyPlayersToMatch(selectedPlayers, matchId, isDarkMode);
+
       // Track when these players were smart matched (for 5-min highlight)
       const now = Date.now();
       setSmartMatchedPlayers(prev => {
@@ -1702,6 +1836,8 @@ function App() {
     
     const { matchId, addedPlayers } = lastSmartMatch;
     const addedPlayerIds = addedPlayers.map(p => p.id);
+
+    flyMatchPlayersHome(matchId, addedPlayers);
     
     // Remove the added players from the match
     setMatches(prev => prev.map(m => {
@@ -2069,6 +2205,7 @@ function App() {
             .filter(Boolean);
           
           if (playersToAdd.length > 0) {
+            flyPlayersToMatch(playersToAdd, m.id, isDarkMode);
             // Merge with any existing smartMatchedPlayerIds
             const existingIds = m.smartMatchedPlayerIds || [];
             const newIds = playersToAdd.map(p => p.id);
@@ -2086,7 +2223,13 @@ function App() {
     if (!lastSmartQueueAll) return;
     
     const { addedPlayers, createdMatchIds = [] } = lastSmartQueueAll;
-    
+
+    // Send each player home from the match they were placed in
+    addedPlayers.forEach(({ playerId, matchId }) => {
+      const player = players.find(p => p.id === playerId);
+      if (player) flyMatchPlayersHome(matchId, [player]);
+    });
+
     // Group by match
     const playersByMatch = {};
     addedPlayers.forEach(({ playerId, matchId }) => {
@@ -2282,6 +2425,22 @@ function App() {
     
     // Record wait times for average calculation
     const now = Date.now();
+    // If this court was just released by largely the same group, their match
+    // effectively never stopped — carry the original start time over.
+    const previousOccupancy = lastCourtOccupancy.current[courtId];
+    let resumedStartTime = null;
+    if (previousOccupancy && Date.now() - previousOccupancy.releasedAt <= 5 * 60 * 1000) {
+      const returning = matchToMove.players
+        .filter(p => previousOccupancy.playerIds.includes(p.id)).length;
+      if (returning >= Math.ceil(previousOccupancy.playerIds.length / 2)) {
+        resumedStartTime = previousOccupancy.startTime;
+      }
+    }
+    if (resumedStartTime) delete lastCourtOccupancy.current[courtId];
+
+    // Each player walks onto the court, one after another
+    flyPlayersToCourt(matchToMove.players, matchId, courtId, isDarkMode);
+
     const waitTimes = matchToMove.players
       .filter(p => p.joinedAt)
       .map(p => Math.round((now - p.joinedAt) / 60000)); // Convert to minutes
@@ -2376,16 +2535,23 @@ function App() {
         c.id === courtId ? { 
           ...c, 
           match: { ...matchToMove, smartMatchedPlayerIds }, 
-          startTime: Date.now(),
-          sortOrder: Date.now() // Used for sorting - only updates when match is assigned
+          startTime: resumedStartTime || Date.now(),
+          // Courts are ordered by this, oldest first. A resumed match keeps its
+          // original time so it stays in place by how long it has been running,
+          // rather than being sent to the bottom as a fresh assignment.
+          sortOrder: resumedStartTime || Date.now()
         } : c
       );
     });
     
-    // Trigger scroll to the court that received the match
-    setScrollToCourtId(courtId);
-    // Clear scroll trigger after a short delay
-    setTimeout(() => setScrollToCourtId(null), 500);
+    // Scroll to the court only when this is a fresh assignment. A match that
+    // went back to the same court keeps its timer and its position in the
+    // order, so there is nothing at the bottom to scroll to.
+    if (!resumedStartTime) {
+      setScrollToCourtId(courtId);
+      // Clear scroll trigger after a short delay
+      setTimeout(() => setScrollToCourtId(null), 2000);
+    }
     
     // Determine if we need to swap after removing this match
     const remainingMatches = matches.filter(m => m.id !== matchId);
@@ -2425,6 +2591,13 @@ function App() {
       }
     }
     
+    // The queue also swaps a reserved match down the list here. That's a real
+    // reorder, but animating it on top of the slide-up reads as a twitch, so
+    // those two cards move instantly instead.
+    if (swapTopMatchId && swapWithMatchId) {
+      skipNextFlip([`m-${swapTopMatchId}`, `m-${swapWithMatchId}`]);
+    }
+
     setMatches(prev => {
       const remaining = prev.filter(m => m.id !== matchId);
       
@@ -2481,6 +2654,10 @@ function App() {
     
     const matchPlayerIds = court.match.players.map(p => p.id);
     const matchPlayers = court.match.players;
+
+    // The four players fly off the court back into the pool, staggered slightly
+    // so they read as a group leaving rather than one blur.
+    flyPlayersToPool(matchPlayers, courtId, isDarkMode);
     
     // Save undo state before making any changes
     const previousPoolPlayersState = poolPlayers
@@ -2563,6 +2740,16 @@ function App() {
     const { courtId, match, startTime, previousPoolPlayers, matchHistoryLength, removedWhileOnCourtPlayers } = lastEndedMatch;
     const matchPlayerIds = match.players.map(p => p.id);
     
+    // Players fly from the pool back onto the court they came from
+    if (match?.players?.length) {
+      flyPlayerGroup(
+        match.players,
+        `[data-court-card="${courtId}"]`,
+        () => `[data-court-card="${courtId}"]`,
+        isDarkMode
+      );
+    }
+
     // Remove the match from history (it was the last one added)
     setMatchHistory(prev => prev.slice(0, matchHistoryLength));
     
@@ -2598,6 +2785,34 @@ function App() {
   };
 
   const returnMatchToQueue = (courtId) => {
+    // Remember who was on this court and since when, so if the same group goes
+    // straight back their timer can continue instead of restarting.
+    const leavingCourt = courts.find(c => c.id === courtId);
+    if (leavingCourt?.match && leavingCourt.startTime) {
+      lastCourtOccupancy.current[courtId] = {
+        playerIds: leavingCourt.match.players.map(p => p.id),
+        startTime: leavingCourt.startTime,
+        releasedAt: Date.now(),
+      };
+    }
+
+    // Bring the destination match into view first, then fly the players back to
+    // it — otherwise the cards travel to a slot that's off screen.
+    const returningMatchId = leavingCourt?.match?.id;
+    if (returningMatchId) setScrollToMatchId(returningMatchId);
+
+    if (leavingCourt?.match?.players?.length) {
+      // Positions are captured now, while the players are still on the court;
+      // only the flight itself waits for the scroll to finish.
+      flyPlayerGroup(
+        leavingCourt.match.players,
+        `[data-court-card="${courtId}"]`,
+        (p) => `[data-slot-player="${p.id}"]`,
+        isDarkMode,
+        420
+      );
+    }
+
     setCourts(prev => {
       const court = prev.find(c => c.id === courtId);
       if (court && court.match) {
@@ -2680,6 +2895,67 @@ function App() {
     });
   }, [matches, setMatchReservations]);
 
+  // Mirror the theme classes onto <body>. Dropdowns are rendered through a
+  // portal into <body>, which sits outside the app's root element - without
+  // this they'd miss the .dark / .neon scoped styling (scrollbars, glows).
+  useEffect(() => {
+    const body = document.body;
+    body.classList.toggle('dark', isDarkMode);
+    body.classList.toggle('neon', theme === 'neon');
+    return () => {
+      body.classList.remove('dark');
+      body.classList.remove('neon');
+    };
+  }, [isDarkMode, theme]);
+
+  // Typing anywhere on the main interface goes into the player pool search, so
+  // you can just start typing a name without clicking the field first.
+  useEffect(() => {
+    const anyWindowOpen = isDbModalOpen || isHistoryModalOpen || isAboutModalOpen
+      || isReportsModalOpen || isSettingsModalOpen;
+
+    const onKeyDown = (e) => {
+      if (anyWindowOpen) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // An alert/confirm/prompt dialog is showing - don't type behind it.
+      if (document.querySelector('[role="alertdialog"]')) return;
+
+      // Don't hijack keys while the user is already typing in a field.
+      const t = e.target;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || t?.isContentEditable) return;
+
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        setPoolSearch(prev => prev.slice(0, -1));
+        return;
+      }
+      if (e.key === 'Escape') {
+        setPoolSearch('');
+        return;
+      }
+      // Single printable characters only, so F1 and other shortcuts still work.
+      if (e.key.length === 1 && /[a-zA-Z0-9 '.-]/.test(e.key)) {
+        e.preventDefault();
+        setPoolSearch(prev => prev + e.key);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isDbModalOpen, isHistoryModalOpen, isAboutModalOpen, isReportsModalOpen, isSettingsModalOpen]);
+
+  // When a pool search narrows to exactly one player, that player is pointed
+  // out wherever they are on the courts or in the queue — so you can see at a
+  // glance where someone actually is.
+  const searchHighlightPlayerId = useMemo(() => {
+    const q = poolSearch.trim().toLowerCase();
+    if (!q) return null;
+    const found = [...poolPlayers, ...notPresentPlayers]
+      .filter(p => p.name.toLowerCase().includes(q));
+    return found.length === 1 ? found[0].id : null;
+  }, [poolSearch, poolPlayers, notPresentPlayers]);
+
   // ==================== Derived State ====================
   
   const selectedMatch = matches.find(m => m.id === selectedMatchId);
@@ -2726,8 +3002,8 @@ function App() {
       {/* Centred in-app alerts (replaces browser alert popups) */}
       <AlertDialog isDarkMode={isDarkMode} />
 
-      {/* Header */}
-      <div className="relative">
+      {/* Header (z-40 so its dropdowns render above the panels below) */}
+      <div className="relative z-40">
       <Header 
         onOpenDatabase={() => setIsDbModalOpen(true)} 
         onOpenHistory={() => setIsHistoryModalOpen(true)}
@@ -2738,6 +3014,9 @@ function App() {
         isDarkMode={isDarkMode}
         theme={theme}
         toggleTheme={cycleTheme}
+        playerCount={players.length}
+        onClearTimers={confirmClearIdleTimes}
+        canClearTimers={poolPlayers.length > 0}
         licenseInfo={licenseInfo}
         syncStatus={syncStatus}
         isOnline={isOnline}
@@ -2766,11 +3045,15 @@ function App() {
               selectedMatch={selectedMatch}
               addPlayerToMatch={addPlayerToMatch}
               selectedMatchId={selectedMatchId}
-              clearIdleTimes={clearIdleTimes}
               onDropPlayerToPool={removePlayerFromMatch}
               onDropPlayerToNotPresent={movePlayerFromMatchToNotPresent}
               isDarkMode={isDarkMode}
               panelWidth={panelWidths.playerPool}
+              allPlayers={players}
+              onAddToPool={addToPool}
+              onAddToAvailable={addToAvailable}
+              onCreatePlayer={addPlayerReturningId}
+              highlightPlayerId={searchHighlightPlayerId}
             />
           </div>
 
@@ -2796,6 +3079,10 @@ function App() {
             }
           }}>
             <MatchQueue
+              scrollToMatchId={scrollToMatchId}
+              onScrolledToMatch={() => setScrollToMatchId(null)}
+              highlightPlayerId={searchHighlightPlayerId}
+              addExternalPlayerToMatch={addExternalPlayerToMatch}
               matches={matches}
               selectedMatchId={selectedMatchId}
               setSelectedMatchId={setSelectedMatchId}
@@ -2848,6 +3135,7 @@ function App() {
           {/* Right Panel - Courts */}
           <div style={{ width: panelWidths.courts }} className="flex-shrink-0">
             <CourtsPanel
+              highlightPlayerId={searchHighlightPlayerId}
               courts={courts}
               newCourtName={newCourtName}
               setNewCourtName={setNewCourtName}

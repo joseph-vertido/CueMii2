@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 4.15.1**
+**Version 4.32.8**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -252,6 +252,240 @@ and compares it to the running `APP_VERSION`. Once a bumped version is pushed to
 > below is retained for legacy history.
 
 ## Version History
+
+- **v4.32.8** - Top button bobs to catch the eye
+
+- **v4.32.7** - Top button restored to full size
+
+- **v4.32.6** - No court scroll for resumed matches; Top button no longer shifts the list
+
+- **v4.32.5** - Return to Queue scrolls to the returning match
+
+- **v4.32.4** - Returning match eases in once, no flash
+
+- **v4.32.3** - Fixed Done button crash from a stray edit
+
+- **v4.32.2** - Return-to-queue animation restored; neon priority border fixed
+
+- **v4.32.1** - Scroll-then-animate sequencing; softer priority glow; Done-cyan + buttons
+
+- **v4.32.0** - Match entrance animation, reliable scroll, orange smart glow, blue add buttons
+
+- **v4.31.1** - Court timer preservation fixed; returned-match background glow
+
+- **v4.31.0** - Court scroll fixed; softer returned glow; timer resumes for a returning group
+
+- **v4.30.6** - Courts scroll to bottom; smoother flights; uppercase court names; Clear Timers password
+
+- **v4.30.6** - Courts scroll to bottom; smoother flights; uppercase court names; Clear Timers password
+
+- **v4.30.4** - Courts back to 2x2 players; stronger, shorter green hold
+
+- **v4.30.3** - Court glow holds green for 45% of the cycle
+
+- **v4.30.2** - Animated Not Present/Available moves; single-column court players in 2-column mode
+
+- **v4.30.1** - Court pulse holds on green; back to a 30-second window
+
+- **v4.30.0** - Smart Match prioritises longest wait on empty matches
+
+- **v4.29.15** - No neon glow on the theme toggle; longer green state on new courts
+
+- **v4.29.14** - Newly assigned courts glow green
+
+- **v4.29.13** - Darker Not Present names in light mode
+
+- **v4.29.12** - White Not Present cards in light mode
+
+- **v4.29.11** - Lighter Not Present player names
+
+- **v4.29.10** - Licence warnings turn critical under 15 days
+
+- **v4.29.9** - Panel contents centred; scrollbar space no longer reserved
+
+- **v4.29.8** - Reverted the panel centring change
+
+- **v4.29.7** - Panel contents centred again
+
+- **v4.29.6** - Fixed flicker when courts and player cards appear
+
+- **v4.29.5** - Court preferences follow the match; animated, smaller court dropdown
+
+- **v4.29.4** - Clear Timers grouped directly above Reset Day
+
+- **v4.29.3** - Clear Timers moved to the More menu
+
+- **v4.29.2** - Brighter Not Present buttons; red Not In Pool header; destination-matched button colours
+
+- **v4.29.1** - Not Present section uses a grey theme
+
+- **v4.29.0** - Bouncing arrow points at the searched player
+
+- **v4.28.5** - Fixed flickering drop highlights
+
+- **v4.28.4** - Animated moves between Not Present and the Match Queue
+
+- **v4.28.3** - Players hold their slots; report printing no longer blocks the app
+
+- **v4.28.2** - Search glow trim fix, match-to-match flights, print margins, and more
+
+- **v4.28.1** - Travelling players stay hidden until their card lands
+
+- **v4.28.0** - Destination appears on landing; menu and court animations; button restyling
+
+- **v4.27.7** - Slower, clearer card flights; new light-mode court buttons
+
+- **v4.27.6** - Empty matches keep the same height as filled ones
+
+- **v4.27.5** - Fixed startup crash from a missing useMemo import
+
+- **v4.27.4** - Court assignment: players walk on individually, then the court moves
+
+- **v4.27.3** - More prominent smart-match border in light mode
+
+- **v4.27.2** - Clearing or undoing a match animates players back to the pool
+
+- **v4.27.1** - Search highlight now pulses in the Match Queue and Courts panels
+
+- **v4.27.0** - Sole search match pulses green when in a match or on court
+
+- **v4.26.4** - Consistent Player Database row height; centred fingerprint icons
+
+- **v4.26.3** - No flicker when opening the new-player panel; matched smart-match glow
+
+- **v4.26.2** - Light-mode cards fade instead of dimming; brighter neon smart glow; shorter database rows
+
+- **v4.26.1** - Section-tinted washed-out cards, inner smart glow, light-mode toast, stable edit rows
+
+- **v4.26.0** - Create players from the pool pickers; animate players returning from matches
+
+- **v4.25.12** - Real cards move when swapping, no clones
+
+- **v4.25.11** - Flights target the court's final position; sections and new matches scroll into view
+
+- **v4.25.10** - Whole match cards swap places when reordering
+
+- **v4.25.9** - Courts animate when they reorder
+
+- **v4.25.8** - Reworked queue animation: only real reordering animates
+
+- **v4.25.7** - Reset Day rename; fixed sideways twitch from scrollbar reflow
+
+- **v4.25.6** - Pool sections always visible; stable match height; return/undo animations
+
+- **v4.25.5** - Fixed the assignment twitch (footer height); animated match reordering; picker close animation
+
+- **v4.25.4** - Removed the post-assignment twitch; dropdowns ease open
+
+- **v4.25.3** - No queue twitch, smart glow restored, precise slot landing, court-to-pool flights
+
+- **v4.25.2** - Queue matches now slide up when a match is assigned
+
+- **v4.25.1** - Fixed flickering pool reorder; smoother glide
+
+- **v4.25.0** - Card motion: settle animations, flying cards, and FLIP reordering
+
+- **v4.24.3** - Removed the grey halo around the BADDIXX logo
+
+- **v4.24.2** - BADDIXX logo reads the same magenta in all themes
+
+- **v4.24.1** - Logo: the "e" counter is now transparent
+
+- **v4.24.0** - New CueMii logo in the header and About window
+
+- **v4.23.7** - Fingerprint check-in visible over open windows; fingerprint cell padding
+
+- **v4.23.6** - Bigger centred fingerprint icon; neon Match History rows
+
+- **v4.23.5** - Sticky header no longer shows rows through it; fingerprint icon column
+
+- **v4.23.4** - Eased back the dropdown resizing
+
+- **v4.23.3** - Smaller level filter and date selectors
+
+- **v4.23.2** - Picker: 8 rows, themed scrollbar, neon styling, hard viewport clamp
+
+- **v4.23.1** - Fixed-size pickers that stay on screen; name alignment; deeper neon fade; brighter court pulse
+
+- **v4.23.0** - Pickers list all players with status dots, stay on screen; equal-width level letters; stronger modal blur
+
+- **v4.22.9** - Neon: In Pool pill now matches the Stored pill treatment
+
+- **v4.22.8** - Slightly brighter background pulse on newly assigned courts
+
+- **v4.22.7** - Neon styling for Player Database action buttons and status pills
+
+- **v4.22.6** - Neon: Not Present header matches its dot colour
+
+- **v4.22.5** - Newly assigned courts pulse their background instead of glowing
+
+- **v4.22.4** - Neon: section headers match their add button colour
+
+- **v4.22.3** - Neon remove button on Not Present cards; bordered level letters in the pickers
+
+- **v4.22.2** - Subtle background tint matching the wait-time border
+
+- **v4.22.1** - Neon wait border: bright opposite corners, visible fade
+
+- **v4.22.0** - Static wait-time borders on pool cards; fading gradient border in neon
+
+- **v4.21.5** - A-Z hover delay reduced to 200ms
+
+- **v4.21.4** - Enter selects the single match in the player pickers
+
+- **v4.21.3** - Picker search clears and refocuses after each selection
+
+- **v4.21.2** - Player pickers stay open after selecting, for adding several in a row
+
+- **v4.21.1** - Right-aligned pickers, red Not Present picker in neon, hover-delay on A-Z index
+
+- **v4.21.0** - Type-anywhere pool search; A-Z indexed player pickers on Available and Not Present
+
+- **v4.20.2** - Neon styling for the pool card check and add buttons
+
+- **v4.20.1** - Not Present check-in button is now a check icon button
+
+- **v4.20.0** - Drag Not Present/Not In Pool players to matches; check-in button on search results
+
+- **v4.19.1** - Player Database: cell left padding and narrower Name column
+
+- **v4.19.0** - New "Not In Pool" search section in the player pool
+
+- **v4.18.2** - Neon: brighter outline on Return to Queue and Undo buttons
+
+- **v4.18.1** - Neon: glowing header icons and lit top-left panel corners
+
+- **v4.18.0** - Click outside to close windows; thicker Player Database scrollbar
+
+- **v4.17.8** - Smaller player search field in Individual reports
+
+- **v4.17.7** - Removed the Manual column from Player Statistics
+
+- **v4.17.6** - Taller Level Combinations, Smart Match Usage and Daily Statistics
+
+- **v4.17.5** - Narrower Reports window
+
+- **v4.17.4** - Reverted bars for gender and combination sections
+
+- **v4.17.3** - Smaller section count badges in the player pool
+
+- **v4.17.2** - Smaller Export PDF and Clear All buttons in Reports
+
+- **v4.17.1** - All report distributions as bars; PDF export fits portrait pages
+
+- **v4.17.0** - Reports (Overall) reorganised: KPI row, titled cards, proportion bars
+
+- **v4.16.5** - Neon: removed stray grey glow on the search bar
+
+- **v4.16.4** - Player pool two-column threshold lowered to 375px
+
+- **v4.16.3** - Player pool stays two-column down to 390px
+
+- **v4.16.2** - Theme toggle matches the notification bell styling
+
+- **v4.16.1** - Fixed dropdowns hidden behind panels; pool column wrapping; More menu placement
+
+- **v4.16.0** - Header overflow menu + notification bell; fixed sun icon
 
 - **v4.15.1** - Slightly more space between name and level in pool cards
 

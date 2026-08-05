@@ -3,6 +3,7 @@ import { showConfirm } from '../utils/appAlert';
 import LevelBadge from './LevelBadge';
 import GenderIcon from './GenderIcon';
 import { formatWaitTime, getWaitTimeColor, getWaitTimeColorLight } from '../utils/formatters';
+import useFlipList from '../hooks/useFlipList';
 
 /**
  * Match queue section for creating and managing matches
@@ -20,6 +21,10 @@ const MatchQueue = ({
   courts,
   getAvailablePoolPlayers,
   addPlayerToMatch,
+  addExternalPlayerToMatch,
+  highlightPlayerId,
+  scrollToMatchId,
+  onScrolledToMatch,
   movePlayerBetweenMatches,
   togglePreferredCourt,
   clearPreferredCourts,
@@ -43,14 +48,99 @@ const MatchQueue = ({
 }) => {
   const [dragOverMatchId, setDragOverMatchId] = useState(null);
   const [openCourtDropdown, setOpenCourtDropdown] = useState(null);
+  const [closingCourtDropdown, setClosingCourtDropdown] = useState(null);
+
+  // Kept mounted briefly so the collapse can play before it unmounts.
+  const closeCourtDropdown = (matchId) => {
+    setClosingCourtDropdown(matchId);
+    setTimeout(() => {
+      setOpenCourtDropdown(null);
+      setClosingCourtDropdown(null);
+    }, 120);
+  };
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [reservationDropdown, setReservationDropdown] = useState(null); // { matchId, slotIndex }
   const [reservationSearch, setReservationSearch] = useState('');
   const dropdownRef = useRef(null);
   const reservationDropdownRef = useRef(null);
   const matchRefs = useRef({});
+  // Remaining match cards glide into place when the queue reorders (tier 3)
+  const queueListRef = useRef(null);
+
+  // Which slot each player was last drawn in, per match. match.players is a
+  // dense list, so without this, removing a player shifts everyone after them
+  // one slot to the left. Remembering their position keeps the others still.
+  const slotMemory = useRef({});
+  useFlipList(queueListRef, { axis: 'y' });
+
+  // A newly created match is marked so it can animate in, and the list is
+  // scrolled all the way to the bottom to meet it.
+  //
+  // Freshness is worked out during the render — an effect runs after the first
+  // paint, which would show the card before its animation started.
+  const seenMatchIds = useRef(null);
+  const freshMatchIds = useRef(new Set());
+  const holdNewMatch = useRef(false);
+  const skipBottomScroll = useRef(false);
+  const [, forceRevealRender] = useState(0);
+  const matchIdList = matches.map(m => m.id);
+  if (seenMatchIds.current === null) {
+    seenMatchIds.current = new Set(matchIdList);
+  } else {
+    const added = matchIdList.filter(id => !seenMatchIds.current.has(id));
+    if (added.length > 0) {
+      added.forEach(id => freshMatchIds.current.add(id));
+      // Set here, in the same pass that spots the new match, so it is already
+      // hidden on the first paint rather than a frame later.
+      holdNewMatch.current = true;
+      // A match arriving back from a court is scrolled to by id; anything else
+      // is a brand-new match at the end of the list. Decided here, once —
+      // re-checking later would flip when the scroll target is cleared.
+      skipBottomScroll.current = !!scrollToMatchId;
+      seenMatchIds.current = new Set(matchIdList);
+    } else if (matchIdList.length !== seenMatchIds.current.size) {
+      seenMatchIds.current = new Set(matchIdList);
+    }
+  }
+
+  // The new match is held invisible until the list has scrolled to it, so the
+  // entrance plays on a settled view rather than during the scroll.
+  useEffect(() => {
+    if (freshMatchIds.current.size === 0) return undefined;
+    // scrollIntoView with 'nearest' stops as soon as the card is on screen,
+    // which often left the list short of the end. Drive the container instead.
+    // (A match returning from a court is scrolled to by scrollToMatchId above.)
+    const container = matchListRef.current;
+    if (container && !skipBottomScroll.current) {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    }
+    const reveal = setTimeout(() => {
+      holdNewMatch.current = false;
+      forceRevealRender(n => n + 1);
+    }, 320);
+    const clear = setTimeout(() => freshMatchIds.current.clear(), 1100);
+    return () => {
+      clearTimeout(reveal);
+      clearTimeout(clear);
+    };
+  }, [matches]);
   const scrollContainerRef = useRef(null);
   const matchListRef = useRef(null);
+
+  // Bring a specific match into view — used when players are on their way back
+  // to it from a court, so they don't fly to a slot that's off screen.
+  // Held in a ref: the callback is recreated on every render, and depending on
+  // it directly made this effect re-run constantly.
+  const onScrolledToMatchRef = useRef(onScrolledToMatch);
+  onScrolledToMatchRef.current = onScrolledToMatch;
+
+  useEffect(() => {
+    if (!scrollToMatchId) return undefined;
+    const el = matchRefs.current[scrollToMatchId];
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const t = setTimeout(() => onScrolledToMatchRef.current?.(), 600);
+    return () => clearTimeout(t);
+  }, [scrollToMatchId]);
   const [lastScrolledMatchId, setLastScrolledMatchId] = useState(null);
 
   // Handle scroll to show/hide scroll-to-top button
@@ -111,12 +201,14 @@ const MatchQueue = ({
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setOpenCourtDropdown(null);
+        if (openCourtDropdown) closeCourtDropdown(openCourtDropdown);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    // openCourtDropdown is read inside, so the listener has to be rebound when
+    // it changes — otherwise it keeps seeing the value from the first render.
+  }, [openCourtDropdown]);
 
   // Close reservation dropdown when clicking outside
   useEffect(() => {
@@ -206,10 +298,15 @@ const MatchQueue = ({
   const handleDragOver = (e, matchId) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragOverMatchId(matchId);
+    setDragOverMatchId(prev => (prev === matchId ? prev : matchId));
   };
 
-  const handleDragLeave = () => {
+  // Match cards contain player slots, and moving onto one of those fires
+  // dragleave on the card — clearing the highlight that dragover immediately
+  // restores. Only clear it once the cursor has actually left the card.
+  const handleDragLeave = (e) => {
+    const leavingTo = e.relatedTarget;
+    if (leavingTo && e.currentTarget.contains(leavingTo)) return;
     setDragOverMatchId(null);
   };
 
@@ -229,6 +326,10 @@ const MatchQueue = ({
       if (data.sourceType === 'pool') {
         // From pool to match
         addPlayerToMatch(targetMatchId, data.player);
+      } else if (data.sourceType === 'notPresent' || data.sourceType === 'notInPool') {
+        // Dropped straight onto a match from Not Present, or from a database
+        // search result: they join the Available group first.
+        addExternalPlayerToMatch?.(targetMatchId, data.player);
       } else if (data.sourceType === 'match' && data.sourceMatchId !== targetMatchId) {
         // From one match to another
         movePlayerBetweenMatches(data.sourceMatchId, targetMatchId, data.player);
@@ -249,7 +350,7 @@ const MatchQueue = ({
       }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+            <div className={`panel-icon panel-icon-amber w-8 h-8 rounded-lg flex items-center justify-center ${
               isDarkMode ? 'bg-orange-500/20' : 'bg-orange-500/30'
             }`}>
               <svg className={`w-5 h-5 ${isDarkMode ? 'text-orange-500' : 'text-orange-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -338,24 +439,35 @@ const MatchQueue = ({
         </div>
       </div>
       
-      <div ref={matchListRef} className="p-2 flex-1 overflow-y-auto custom-scrollbar relative">
-        {/* Floating Scroll to Top Button */}
-        {showScrollToTop && (
-          <button
-            onClick={scrollToTop}
-            className={`sticky top-2 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full shadow-xl transition-all flex items-center gap-2 animate-bounce-subtle ${
-              isDarkMode 
-                ? 'bg-amber-600 hover:bg-amber-500 text-white' 
-                : 'bg-amber-500 hover:bg-amber-400 text-white'
-            }`}
-            title="Scroll to top"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-            </svg>
-            <span className="text-sm font-semibold">Top</span>
-          </button>
-        )}
+      <div ref={matchListRef} className="p-2 flex-1 overflow-y-auto custom-scrollbar relative" style={{ overflowAnchor: 'none' }}>
+        {/* Floating Scroll to Top Button.
+            Absolutely positioned rather than sticky: a sticky button takes up
+            vertical space, so appearing and disappearing pushed everything
+            below it and made the scroll jump. The wrapper is now zero-height, so
+            it holds the button in place without occupying any of the list, and
+            the button fades rather than being added and removed. */}
+        <div className="sticky top-2 h-0 z-10 flex justify-center items-start overflow-visible pointer-events-none">
+        <button
+          onClick={scrollToTop}
+          aria-hidden={!showScrollToTop}
+          tabIndex={showScrollToTop ? 0 : -1}
+          className={`flex-none px-4 py-2 rounded-full shadow-xl flex items-center gap-2 transition-all duration-200 ${
+            showScrollToTop
+              ? 'opacity-100 pointer-events-auto animate-bounce-top'
+              : 'opacity-0 -translate-y-2 pointer-events-none'
+          } ${
+            isDarkMode 
+              ? 'bg-amber-600 hover:bg-amber-500 text-white' 
+              : 'bg-amber-500 hover:bg-amber-400 text-white'
+          }`}
+          title="Scroll to top"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+          </svg>
+          <span className="text-sm font-semibold">Top</span>
+        </button>
+        </div>
         
         {matches.length === 0 ? (
           <div className={`text-center py-6 ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>
@@ -365,7 +477,7 @@ const MatchQueue = ({
             <p className="text-sm">No matches in queue</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div ref={queueListRef} className="space-y-2" style={{ overflowAnchor: 'none' }}>
             {(() => {
               const sortedMatches = [...matches].sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
               return sortedMatches.map((match, matchIndex) => {
@@ -403,7 +515,7 @@ const MatchQueue = ({
                 borderClass = isDarkMode ? 'border-cyan-400' : 'border-cyan-500';
               } else if (isHighlightedPriority) {
                 bgClass = isDarkMode ? 'bg-emerald-900/30' : 'bg-emerald-50/70';
-                borderClass = 'border-emerald-500 animate-pulse-priority';
+                borderClass = 'border-emerald-500/70 animate-pulse-priority';
               } else if (isRecentlyReturned) {
                 bgClass = isDarkMode ? 'bg-red-900/30' : 'bg-red-50/70';
                 borderClass = 'border-red-500 animate-pulse-returned';
@@ -433,13 +545,19 @@ const MatchQueue = ({
                 onDragOver={(e) => handleDragOver(e, match.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, match.id)}
-                className={`queue-card rounded-lg border transition-all ${bgClass} ${selectedClass || borderClass} ${
+                data-match-card={match.id}
+                data-flip-key={`m-${match.id}`}
+                className={`queue-card rounded-lg border transition-all ${
+                  freshMatchIds.current.has(match.id)
+                    ? (holdNewMatch.current ? 'opacity-0 ' : 'animate-match-appear ')
+                    : ''
+                }${bgClass} ${selectedClass || borderClass} ${
                   selectedMatchId !== match.id ? 'hover:border-slate-600' : ''
                 }`}
               >
                 {/* Preferred Courts Label */}
                 {match.preferredCourts && match.preferredCourts.length > 0 && (
-                  <div className={`border-b px-2 py-1 flex items-center gap-2 rounded-t-lg ${
+                  <div className={`border-b px-2 h-7 flex items-center gap-2 rounded-t-lg ${
                     isDarkMode 
                       ? 'bg-amber-500/20 border-amber-500/30' 
                       : 'bg-amber-100 border-amber-400'
@@ -448,9 +566,9 @@ const MatchQueue = ({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span className={`text-sm font-medium ${isDarkMode ? 'text-amber-300' : 'text-amber-700'}`}>
-                      Waiting for: {match.preferredCourts.map(courtId => 
+                      Waiting for: <span className="uppercase">{match.preferredCourts.map(courtId => 
                         courts.find(c => c.id === courtId)?.name || 'Unknown'
-                      ).join(', ')}
+                      ).join(', ')}</span>
                     </span>
                     <button
                       onClick={() => clearPreferredCourts(match.id)}
@@ -489,7 +607,11 @@ const MatchQueue = ({
                       {/* Preferred Courts Multi-Select Dropdown */}
                       <div className="relative" ref={openCourtDropdown === match.id ? dropdownRef : null}>
                         <button
-                          onClick={() => setOpenCourtDropdown(openCourtDropdown === match.id ? null : match.id)}
+                          onClick={() => (
+                            openCourtDropdown === match.id
+                              ? closeCourtDropdown(match.id)
+                              : (setClosingCourtDropdown(null), setOpenCourtDropdown(match.id))
+                          )}
                           className={`border rounded px-1.5 py-0.5 text-xs focus:outline-none cursor-pointer flex items-center gap-0.5 ${
                             isDarkMode 
                               ? 'bg-slate-700 border-slate-600 text-slate-300 hover:border-teal-500' 
@@ -503,7 +625,9 @@ const MatchQueue = ({
                           </svg>
                         </button>
                         {openCourtDropdown === match.id && (
-                          <div className={`absolute top-full left-0 mt-1 border rounded-lg shadow-xl z-50 min-w-[150px] ${
+                          <div className={`court-dropdown absolute top-full left-0 mt-1 border rounded-lg shadow-xl z-50 min-w-[140px] overflow-hidden ${
+                            closingCourtDropdown === match.id ? 'animate-menu-collapse' : 'animate-menu-expand'
+                          } ${
                             isDarkMode 
                               ? 'bg-slate-800 border-slate-600' 
                               : 'bg-white border-slate-300'
@@ -513,7 +637,7 @@ const MatchQueue = ({
                               return (
                                 <label
                                   key={court.id}
-                                  className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-sm ${
+                                  className={`flex items-center gap-2 px-2.5 py-1.5 cursor-pointer text-xs ${
                                     isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
                                   }`}
                                 >
@@ -521,7 +645,7 @@ const MatchQueue = ({
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => togglePreferredCourt(match.id, court.id)}
-                                    className="rounded border-slate-500 bg-slate-700 text-green-500 focus:ring-green-500"
+                                    className="w-3 h-3 rounded border-slate-500 bg-slate-700 text-green-500 focus:ring-green-500"
                                   />
                                   <span className={`uppercase ${
                                     isSelected 
@@ -668,12 +792,35 @@ const MatchQueue = ({
                         const i = Number(slotIndex);
                         if (i >= 0 && i < 4) layout[i] = { reservedFor: resPlayer };
                       });
-                      let nextPlayer = 0;
-                      for (let i = 0; i < 4; i++) {
-                        if (!layout[i] && nextPlayer < match.players.length) {
-                          layout[i] = { player: match.players[nextPlayer++] };
+
+                      const memory = slotMemory.current[match.id] || {};
+                      const nextMemory = {};
+
+                      // Players already on screen stay exactly where they were,
+                      // as long as that slot isn't reserved.
+                      const unplaced = [];
+                      match.players.forEach(pl => {
+                        const remembered = memory[pl.id];
+                        if (remembered !== undefined && !layout[remembered]) {
+                          layout[remembered] = { player: pl };
+                          nextMemory[pl.id] = remembered;
+                        } else {
+                          unplaced.push(pl);
                         }
-                      }
+                      });
+
+                      // Anyone new takes the first free slot.
+                      unplaced.forEach(pl => {
+                        for (let i = 0; i < 4; i++) {
+                          if (!layout[i]) {
+                            layout[i] = { player: pl };
+                            nextMemory[pl.id] = i;
+                            break;
+                          }
+                        }
+                      });
+
+                      slotMemory.current[match.id] = nextMemory;
                       return layout;
                     })().map((slot, index) => {
                       const player = slot?.player;
@@ -683,12 +830,13 @@ const MatchQueue = ({
                           key={index}
                           draggable={!!player}
                           onDragStart={(e) => player && handleDragStart(e, player, match.id)}
-                          className={`queue-slot relative flex-1 rounded pl-3 pr-2 py-1.5 border ${player ? 'overflow-hidden' : ''} ${
+                          data-slot-player={player ? player.id : undefined}
+                          className={`queue-slot relative flex-1 rounded pl-3 pr-2 py-1.5 border ${player && player.id === highlightPlayerId ? 'card-search-found ' : ''}${player ? `overflow-hidden ${isRecentSmart ? '' : 'animate-slot-fill'}` : ''} ${
                             player 
                               ? isRecentSmart
                                 ? isDarkMode 
-                                  ? 'bg-slate-900/70 border-amber-400 animate-smart-match cursor-grab active:cursor-grabbing'
-                                  : 'bg-white border-amber-500 animate-smart-match cursor-grab active:cursor-grabbing'
+                                  ? 'bg-slate-900/70 border-amber-400/50 animate-smart-match cursor-grab active:cursor-grabbing'
+                                  : 'bg-white border-orange-500/90 animate-smart-match-light cursor-grab active:cursor-grabbing'
                                 : isDarkMode 
                                   ? 'bg-slate-900/70 border-slate-700 cursor-grab active:cursor-grabbing'
                                   : 'bg-white border-slate-300 cursor-grab active:cursor-grabbing'
@@ -717,7 +865,7 @@ const MatchQueue = ({
                                   isDarkMode ? getWaitTimeColor(player.joinedAt) : getWaitTimeColorLight(player.joinedAt)
                                 }`} title="Wait time"><svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>{formatWaitTime(player.joinedAt)}</span>
                                 <span className={isDarkMode ? 'text-slate-400' : 'text-slate-600'} title="Games played">🏸{player.playCount || 0}</span>
-                                <span className={`px-1 py-0.5 rounded font-bold text-[10px] ${
+                                <span className={`w-4 text-center py-0.5 rounded font-bold text-[10px] ${
                                   player.level === 'Expert' 
                                     ? (isDarkMode ? 'bg-purple-500/50 text-purple-200 border border-purple-400/50' : 'bg-purple-100 text-purple-700 border border-purple-400')
                                     : player.level === 'Advanced' 
@@ -867,8 +1015,11 @@ const MatchQueue = ({
                     })}
                   </div>
                   
-                  {/* Move to Court - Compact */}
-                  {match.players.length > 0 && (() => {
+                  {/* Move to Court - Compact.
+                      Always rendered: with no players it shows the "Need 4
+                      players" message, so an empty match is the same height as
+                      a filled one and the card doesn't grow as players join. */}
+                  {(() => {
                     // Get available (empty) courts
                     const availableCourts = courts.filter(c => !c.match);
                     
@@ -902,8 +1053,11 @@ const MatchQueue = ({
                     return (
                       <div className="flex gap-1">
                         {!isComplete ? (
-                          <div className={`flex-1 text-center text-xs py-1 ${isDarkMode ? 'text-red-400' : 'text-red-500'}`}>
-                            Need 4 players to assign court
+                          /* An empty match shows nothing here, but keeps the
+                             same height so the card doesn't grow as the first
+                             player is added. */
+                          <div className={`flex-1 h-5 flex items-center justify-center text-center text-xs ${isDarkMode ? 'text-red-400' : 'text-red-500'}`}>
+                            {match.players.length > 0 ? 'Need 4 players to assign court' : ''}
                           </div>
                         ) : filteredCourts.map(court => {
                           const isWantedByHigher = courtsWaitedByHigherMatches.has(court.id);
@@ -911,15 +1065,15 @@ const MatchQueue = ({
                           if (hasPreferredCourts) {
                             buttonClass = isDarkMode 
                               ? 'bg-amber-800 hover:bg-amber-700 text-amber-50' 
-                              : 'bg-amber-200 hover:bg-amber-300 text-amber-900 border border-amber-400';
+                              : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-500 shadow-sm hover:shadow';
                           } else if (isWantedByHigher) {
                             buttonClass = isDarkMode 
                               ? 'bg-amber-800 hover:bg-amber-700 text-amber-50' 
-                              : 'bg-amber-200 hover:bg-amber-300 text-amber-900 border border-amber-400';
+                              : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-500 shadow-sm hover:shadow';
                           } else {
                             buttonClass = isDarkMode 
                               ? 'bg-cyan-800 hover:bg-cyan-700 text-cyan-50' 
-                              : 'bg-cyan-200 hover:bg-cyan-300 text-cyan-900 border border-cyan-400';
+                              : 'bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-500 shadow-sm hover:shadow';
                           }
                           return (
                             <button
@@ -936,7 +1090,7 @@ const MatchQueue = ({
                           );
                         })}
                         {isComplete && filteredCourts.length === 0 && (
-                          <div className="flex-1 text-center text-slate-500 text-xs py-1">
+                          <div className="flex-1 h-5 flex items-center justify-center text-center text-slate-500 text-xs">
                             {hasPreferredCourts ? 'Preferred courts busy' : 'No courts available'}
                           </div>
                         )}

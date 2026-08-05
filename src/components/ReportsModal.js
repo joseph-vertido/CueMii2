@@ -14,6 +14,45 @@ const ReportsModal = ({
   isDarkMode = true 
 }) => {
   const [activeTab, setActiveTab] = useState('overall');
+
+  // --- Report layout helpers -------------------------------------------
+  // One headline figure: small uppercase label above a large value.
+  const Kpi = ({ label, value, unit, accent }) => (
+    <div className={`rounded-xl px-3 py-2.5 border ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+      <p className={`text-[10px] font-semibold tracking-wider ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+        {label}
+      </p>
+      <p className={`text-2xl font-bold leading-none mt-1.5 ${accent || (isDarkMode ? 'text-white' : 'text-slate-800')}`}>
+        {value}
+        {unit && <span className={`text-xs font-medium ml-0.5 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{unit}</span>}
+      </p>
+    </div>
+  );
+
+  // A titled section card, so every block of the report is framed the same way.
+  const Card = ({ title, right, children, className = '' }) => (
+    <div className={`rounded-xl border overflow-hidden ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'} ${className}`}>
+      <div className={`px-4 py-2.5 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+        <h3 className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{title}</h3>
+        {right}
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+
+  // A labelled proportion bar - used for skill mix and court usage.
+  const Bar = ({ label, value, max, color, labelColor }) => (
+    <div>
+      <div className="flex justify-between text-xs mb-1">
+        <span className={labelColor || (isDarkMode ? 'text-slate-300' : 'text-slate-600')}>{label}</span>
+        <span className={isDarkMode ? 'text-slate-500' : 'text-slate-500'}>{value}</span>
+      </div>
+      <div className={`h-1.5 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-900' : 'bg-slate-200'}`}>
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${max > 0 ? (value / max) * 100 : 0}%` }} />
+      </div>
+    </div>
+  );
+
   const [selectedDate, setSelectedDate] = useState('all');
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const [playerSearchTerm, setPlayerSearchTerm] = useState('');
@@ -729,13 +768,6 @@ const ReportsModal = ({
         return;
       }
 
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        showAlert('Please allow pop-ups to export PDF');
-        setIsExporting(false);
-        return;
-      }
-
       const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
         .map(style => style.outerHTML)
         .join('\n');
@@ -817,13 +849,23 @@ const ReportsModal = ({
       const playerName = reportType === 'individual' && selectedPlayer ? ` - ${selectedPlayer.name}` : '';
       const title = `CueMii ${reportType === 'overall' ? 'Overall' : 'Individual'} Report - ${dateStr}${playerName}`;
 
-      printWindow.document.write(`
+      const reportHtml = `
         <!DOCTYPE html>
         <html>
         <head>
           <title>${title}</title>
           ${styles}
           <style>
+            /* Portrait A4/Letter with tight margins. Without this the browser
+               used its own default and the content (800px wide) overflowed the
+               printable width, cutting off the Player Statistics table. */
+            @page {
+              size: portrait;
+              /* Generous top/bottom margins so content never runs to the very
+                 edge of a printed page, including on pages 2 and beyond. */
+              margin: 16mm 12mm;
+            }
+
             @media print {
               body {
                 -webkit-print-color-adjust: exact !important;
@@ -834,10 +876,48 @@ const ReportsModal = ({
                 max-height: none !important;
                 overflow: visible !important;
               }
+
+              /* Fit the report to the printable width of a portrait page */
+              .report-content {
+                max-width: 100% !important;
+                width: 100% !important;
+              }
+
+              /* If the browser's print dialog is set to "no margins", @page has
+                 no effect — these keep a little breathing room regardless. */
+              body {
+                padding: 8mm 6mm !important;
+              }
+
+              /* Tables: shrink to fit rather than run off the page */
+              table {
+                width: 100% !important;
+                table-layout: fixed !important;
+                font-size: 8pt !important;
+                border-collapse: collapse !important;
+              }
+              th, td {
+                padding: 2px 3px !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
+                white-space: normal !important;
+              }
+              /* Repeat the header when a long table spans pages */
+              thead {
+                display: table-header-group !important;
+              }
+              tr, .report-card, .rounded-xl {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+              }
+              /* Grids stay side-by-side but can't force overflow */
+              .grid {
+                gap: 6px !important;
+              }
             }
             body {
               margin: 0;
-              padding: 20px;
+              padding: 12px;
               background: #ffffff !important;
             }
             .report-content {
@@ -862,10 +942,30 @@ const ReportsModal = ({
           </script>
         </body>
         </html>
-      `);
-      
-      printWindow.document.close();
-      
+      `;
+
+      // Opened as a blob with `noopener` rather than written into a window we
+      // keep a handle to. A window opened the usual way stays linked to this
+      // one and shares its process, so its print dialog freezes CueMii until
+      // it's dismissed — most noticeably in Edge. Severing that link lets the
+      // report print in its own context while the app stays usable.
+      const blob = new Blob([reportHtml], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Opened by clicking a rel="noopener" link rather than window.open, which
+      // returns null for noopener windows and so gives us nothing to test. A
+      // link click from a user gesture is also less likely to be blocked.
+      const opener = document.createElement('a');
+      opener.href = blobUrl;
+      opener.target = '_blank';
+      opener.rel = 'noopener noreferrer';
+      document.body.appendChild(opener);
+      opener.click();
+      opener.remove();
+
+      // Give the new tab time to load before releasing the blob.
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+
       setTimeout(() => {
         setIsExporting(false);
       }, 1000);
@@ -890,8 +990,8 @@ const ReportsModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`neon-panel rounded-2xl w-[1100px] h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border ${
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className={`neon-panel rounded-2xl w-[92vw] max-w-[980px] h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border ${
         isDarkMode 
           ? 'bg-slate-900 border-violet-500/30' 
           : 'bg-white border-violet-300'
@@ -906,7 +1006,8 @@ const ReportsModal = ({
           </div>
           <div className="flex items-center gap-3">
             <ThemedSelect
-              className="w-48 flex-none"
+              className="w-44 flex-none"
+              compact
               value={selectedDate}
               onChange={(e) => {
                 setSelectedDate(e.target.value);
@@ -923,13 +1024,13 @@ const ReportsModal = ({
             <button
               onClick={() => exportToPDF(activeTab)}
               disabled={isExporting || (activeTab === 'individual' && !selectedPlayer)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border shadow-sm transition-colors flex items-center gap-1.5 ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border shadow-sm transition-colors flex items-center gap-1 ${
                 isExporting || (activeTab === 'individual' && !selectedPlayer)
                   ? (isDarkMode ? 'bg-slate-700 text-slate-400 border-slate-600 cursor-not-allowed' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed')
                   : 'bg-cyan-600 hover:bg-cyan-500 text-white border-cyan-500'
               }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               {isExporting ? 'Exporting...' : 'Export PDF'}
@@ -937,9 +1038,9 @@ const ReportsModal = ({
             
             <button
               onClick={handleClearReports}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${isDarkMode ? 'bg-red-500/30 hover:bg-red-500/50 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'}`}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${isDarkMode ? 'bg-red-500/30 hover:bg-red-500/50 text-white' : 'bg-red-100 hover:bg-red-200 text-red-700'}`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
               Clear All
@@ -1007,49 +1108,45 @@ const ReportsModal = ({
                     </h3>
                   </div>
 
-                  {/* Summary Stats */}
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                      <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Total Matches</p>
-                      <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{filteredMatches.length}</p>
-                    </div>
-                    <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                      <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Unique Players</p>
-                      <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                        {new Set(filteredMatches.flatMap(m => m.players?.map(p => p.id) || [])).size}
-                      </p>
-                    </div>
-                    <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                      <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Smart Matches</p>
-                      <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                        {filteredMatches.filter(m => m.smartMatchedPlayerIds?.length > 0).length}
-                      </p>
-                    </div>
-                    <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                      <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>Avg Wait Time</p>
-                      <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{waitTimeStats.avgWaitTime}m</p>
-                    </div>
+                  {/* Headline figures */}
+                  <div className="grid grid-cols-5 gap-3">
+                    <Kpi label="MATCHES" value={filteredMatches.length} />
+                    <Kpi
+                      label="PLAYERS"
+                      value={new Set(filteredMatches.flatMap(m => m.players?.map(p => p.id) || [])).size}
+                    />
+                    <Kpi
+                      label="AVG WAIT"
+                      value={waitTimeStats.avgWaitTime}
+                      unit="m"
+                      accent={isDarkMode ? 'text-cyan-300' : 'text-cyan-700'}
+                    />
+                    <Kpi
+                      label="GAMES"
+                      value={filteredMatches.reduce((sum, m) => sum + (m.players?.length || 0), 0)}
+                    />
+                    <Kpi
+                      label="SMART"
+                      value={filteredMatches.filter(m => m.smartMatchedPlayerIds?.length > 0).length}
+                      accent={isDarkMode ? 'text-purple-300' : 'text-purple-700'}
+                    />
                   </div>
 
                   {/* Gender and Level Breakdown */}
                   <div className="grid grid-cols-2 gap-4">
                     {/* Gender Counts */}
-                    <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                      <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                        Players by Gender
-                      </h3>
+                    <Card title="Players by gender">
                       <div className="grid grid-cols-2 gap-3">
                         {(() => {
                           const uniquePlayers = new Map();
                           filteredMatches.forEach(m => {
                             m.players?.forEach(p => {
-                              if (!uniquePlayers.has(p.id)) {
-                                uniquePlayers.set(p.id, p);
-                              }
+                              if (!uniquePlayers.has(p.id)) uniquePlayers.set(p.id, p);
                             });
                           });
-                          const males = [...uniquePlayers.values()].filter(p => p.gender === 'male').length;
-                          const females = [...uniquePlayers.values()].filter(p => p.gender === 'female').length;
+                          const all = [...uniquePlayers.values()];
+                          const males = all.filter(p => p.gender === 'male').length;
+                          const females = all.filter(p => p.gender === 'female').length;
                           return (
                             <>
                               <div className={`rounded-lg p-3 text-center ${isDarkMode ? 'bg-blue-500/20 border border-blue-500/30' : 'bg-blue-100 border border-blue-200'}`}>
@@ -1064,103 +1161,85 @@ const ReportsModal = ({
                           );
                         })()}
                       </div>
-                    </div>
+                    </Card>
 
                     {/* Level Counts */}
-                    <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                      <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                        Players by Level
-                      </h3>
-                      <div className="grid grid-cols-4 gap-2">
-                        {(() => {
-                          const uniquePlayers = new Map();
-                          filteredMatches.forEach(m => {
-                            m.players?.forEach(p => {
-                              if (!uniquePlayers.has(p.id)) {
-                                uniquePlayers.set(p.id, p);
-                              }
-                            });
+                    <Card title="Skill mix">
+                      {(() => {
+                        const uniquePlayers = new Map();
+                        filteredMatches.forEach(m => {
+                          m.players?.forEach(p => {
+                            if (!uniquePlayers.has(p.id)) uniquePlayers.set(p.id, p);
                           });
-                          const experts = [...uniquePlayers.values()].filter(p => p.level === 'Expert').length;
-                          const advanced = [...uniquePlayers.values()].filter(p => p.level === 'Advanced').length;
-                          const intermediate = [...uniquePlayers.values()].filter(p => p.level === 'Intermediate').length;
-                          const novice = [...uniquePlayers.values()].filter(p => p.level === 'Novice').length;
-                          return (
-                            <>
-                              <div className={`rounded-lg p-2 text-center ${isDarkMode ? 'bg-purple-500/20 border border-purple-500/30' : 'bg-purple-100 border border-purple-200'}`}>
-                                <p className={`text-xl font-bold ${isDarkMode ? 'text-purple-400' : 'text-purple-700'}`}>{experts}</p>
-                                <p className={`text-xs ${isDarkMode ? 'text-purple-400/70' : 'text-purple-600'}`}>Expert</p>
-                              </div>
-                              <div className={`rounded-lg p-2 text-center ${isDarkMode ? 'bg-orange-500/20 border border-orange-500/30' : 'bg-orange-100 border border-orange-200'}`}>
-                                <p className={`text-xl font-bold ${isDarkMode ? 'text-orange-400' : 'text-orange-700'}`}>{advanced}</p>
-                                <p className={`text-xs ${isDarkMode ? 'text-orange-400/70' : 'text-orange-600'}`}>Adv</p>
-                              </div>
-                              <div className={`rounded-lg p-2 text-center ${isDarkMode ? 'bg-blue-500/20 border border-blue-500/30' : 'bg-blue-100 border border-blue-200'}`}>
-                                <p className={`text-xl font-bold ${isDarkMode ? 'text-blue-400' : 'text-blue-700'}`}>{intermediate}</p>
-                                <p className={`text-xs ${isDarkMode ? 'text-blue-400/70' : 'text-blue-600'}`}>Int</p>
-                              </div>
-                              <div className={`rounded-lg p-2 text-center ${isDarkMode ? 'bg-green-500/20 border border-green-500/30' : 'bg-green-100 border border-green-200'}`}>
-                                <p className={`text-xl font-bold ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>{novice}</p>
-                                <p className={`text-xs ${isDarkMode ? 'text-green-400/70' : 'text-green-600'}`}>Nov</p>
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
+                        });
+                        const all = [...uniquePlayers.values()];
+                        const rows = [
+                          { label: 'Expert', n: all.filter(p => p.level === 'Expert').length, color: 'bg-purple-500', text: isDarkMode ? 'text-purple-300' : 'text-purple-700' },
+                          { label: 'Advanced', n: all.filter(p => p.level === 'Advanced').length, color: 'bg-orange-500', text: isDarkMode ? 'text-orange-300' : 'text-orange-700' },
+                          { label: 'Intermediate', n: all.filter(p => p.level === 'Intermediate').length, color: 'bg-cyan-500', text: isDarkMode ? 'text-cyan-300' : 'text-cyan-700' },
+                          { label: 'Novice', n: all.filter(p => p.level === 'Novice').length, color: 'bg-lime-500', text: isDarkMode ? 'text-lime-300' : 'text-lime-700' },
+                        ];
+                        const max = Math.max(1, ...rows.map(r => r.n));
+                        return (
+                          <div className="space-y-2.5">
+                            {rows.map(r => (
+                              <Bar key={r.label} label={r.label} value={r.n} max={max} color={r.color} labelColor={r.text} />
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </Card>
                   </div>
 
-                  {/* Wait Time Distribution */}
-                  <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                    <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                      Wait Time Distribution
-                    </h3>
-                    <div className="grid grid-cols-4 gap-3">
-                      <div className={`rounded-lg p-3 text-center ${isDarkMode ? 'bg-green-500/20 border border-green-500/30' : 'bg-green-100 border border-green-200'}`}>
-                        <p className={`text-2xl font-bold ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>{waitTimeStats.distribution.under20}</p>
-                        <p className={`text-xs ${isDarkMode ? 'text-green-400/70' : 'text-green-600'}`}>&lt; 20 min</p>
-                      </div>
-                      <div className={`rounded-lg p-3 text-center ${isDarkMode ? 'bg-yellow-500/20 border border-yellow-500/30' : 'bg-yellow-100 border border-yellow-200'}`}>
-                        <p className={`text-2xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>{waitTimeStats.distribution.between20and30}</p>
-                        <p className={`text-xs ${isDarkMode ? 'text-yellow-400/70' : 'text-yellow-600'}`}>20-30 min</p>
-                      </div>
-                      <div className={`rounded-lg p-3 text-center ${isDarkMode ? 'bg-orange-500/20 border border-orange-500/30' : 'bg-orange-100 border border-orange-200'}`}>
-                        <p className={`text-2xl font-bold ${isDarkMode ? 'text-orange-400' : 'text-orange-700'}`}>{waitTimeStats.distribution.between30and40}</p>
-                        <p className={`text-xs ${isDarkMode ? 'text-orange-400/70' : 'text-orange-600'}`}>30-40 min</p>
-                      </div>
-                      <div className={`rounded-lg p-3 text-center ${isDarkMode ? 'bg-red-500/20 border border-red-500/30' : 'bg-red-100 border border-red-200'}`}>
-                        <p className={`text-2xl font-bold ${isDarkMode ? 'text-red-400' : 'text-red-700'}`}>{waitTimeStats.distribution.over40}</p>
-                        <p className={`text-xs ${isDarkMode ? 'text-red-400/70' : 'text-red-600'}`}>&gt; 40 min</p>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Wait time and match length, side by side */}
+                  <div className="grid grid-cols-2 gap-4">
+                  <Card title="Wait time spread">
+                    {(() => {
+                      const d = waitTimeStats.distribution;
+                      const rows = [
+                        { label: 'Under 20 min', n: d.under20, color: 'bg-green-500', text: isDarkMode ? 'text-green-300' : 'text-green-700' },
+                        { label: '20 - 30 min', n: d.between20and30, color: 'bg-yellow-500', text: isDarkMode ? 'text-yellow-300' : 'text-yellow-700' },
+                        { label: '30 - 40 min', n: d.between30and40, color: 'bg-orange-500', text: isDarkMode ? 'text-orange-300' : 'text-orange-700' },
+                        { label: 'Over 40 min', n: d.over40, color: 'bg-red-500', text: isDarkMode ? 'text-red-300' : 'text-red-700' },
+                      ];
+                      const max = Math.max(1, ...rows.map(r => r.n));
+                      return (
+                        <div className="space-y-2.5">
+                          {rows.map(r => (
+                            <Bar key={r.label} label={r.label} value={r.n} max={max} color={r.color} labelColor={r.text} />
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </Card>
 
                   {/* Court Timer Duration */}
-                  <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                    <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                      Court Timer Duration
-                      <span className={`text-xs font-normal ml-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        (Avg: {courtDurationStats.avgDuration}m)
+                  <Card
+                    title="Match length spread"
+                    right={
+                      <span className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Avg {courtDurationStats.avgDuration}m
                       </span>
-                    </h3>
-                    <div className="grid grid-cols-4 gap-3">
-                      <div className={`rounded-lg p-3 text-center ${isDarkMode ? 'bg-green-500/20 border border-green-500/30' : 'bg-green-100 border border-green-200'}`}>
-                        <p className={`text-2xl font-bold ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>{courtDurationStats.distribution.under20}</p>
-                        <p className={`text-xs ${isDarkMode ? 'text-green-400/70' : 'text-green-600'}`}>&lt; 20 min</p>
-                      </div>
-                      <div className={`rounded-lg p-3 text-center ${isDarkMode ? 'bg-yellow-500/20 border border-yellow-500/30' : 'bg-yellow-100 border border-yellow-200'}`}>
-                        <p className={`text-2xl font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>{courtDurationStats.distribution.between20and30}</p>
-                        <p className={`text-xs ${isDarkMode ? 'text-yellow-400/70' : 'text-yellow-600'}`}>20-30 min</p>
-                      </div>
-                      <div className={`rounded-lg p-3 text-center ${isDarkMode ? 'bg-orange-500/20 border border-orange-500/30' : 'bg-orange-100 border border-orange-200'}`}>
-                        <p className={`text-2xl font-bold ${isDarkMode ? 'text-orange-400' : 'text-orange-700'}`}>{courtDurationStats.distribution.between30and40}</p>
-                        <p className={`text-xs ${isDarkMode ? 'text-orange-400/70' : 'text-orange-600'}`}>30-40 min</p>
-                      </div>
-                      <div className={`rounded-lg p-3 text-center ${isDarkMode ? 'bg-red-500/20 border border-red-500/30' : 'bg-red-100 border border-red-200'}`}>
-                        <p className={`text-2xl font-bold ${isDarkMode ? 'text-red-400' : 'text-red-700'}`}>{courtDurationStats.distribution.over40}</p>
-                        <p className={`text-xs ${isDarkMode ? 'text-red-400/70' : 'text-red-600'}`}>&gt; 40 min</p>
-                      </div>
-                    </div>
+                    }
+                  >
+                    {(() => {
+                      const d = courtDurationStats.distribution;
+                      const rows = [
+                        { label: 'Under 20 min', n: d.under20, color: 'bg-green-500', text: isDarkMode ? 'text-green-300' : 'text-green-700' },
+                        { label: '20 - 30 min', n: d.between20and30, color: 'bg-yellow-500', text: isDarkMode ? 'text-yellow-300' : 'text-yellow-700' },
+                        { label: '30 - 40 min', n: d.between30and40, color: 'bg-orange-500', text: isDarkMode ? 'text-orange-300' : 'text-orange-700' },
+                        { label: 'Over 40 min', n: d.over40, color: 'bg-red-500', text: isDarkMode ? 'text-red-300' : 'text-red-700' },
+                      ];
+                      const max = Math.max(1, ...rows.map(r => r.n));
+                      return (
+                        <div className="space-y-2.5">
+                          {rows.map(r => (
+                            <Bar key={r.label} label={r.label} value={r.n} max={max} color={r.color} labelColor={r.text} />
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </Card>
                   </div>
 
                   {/* Daily Charts */}
@@ -1297,9 +1376,6 @@ const ReportsModal = ({
                               <th className="text-center py-2 px-2 cursor-pointer hover:text-violet-400" onClick={() => handleSort('smartMatchGames')}>
                                 Smart<SortIndicator column="smartMatchGames" />
                               </th>
-                              <th className="text-center py-2 px-2 cursor-pointer hover:text-violet-400" onClick={() => handleSort('noSmartMatchGames')}>
-                                Manual<SortIndicator column="noSmartMatchGames" />
-                              </th>
                               <th className="text-center py-2 px-1 cursor-pointer hover:text-violet-400" onClick={() => handleSort('waitUnder20')}>
                                 <span className={isDarkMode ? 'text-green-400' : 'text-green-600'}>&lt;20m</span>
                                 <SortIndicator column="waitUnder20" />
@@ -1355,7 +1431,6 @@ const ReportsModal = ({
                                 <td className="text-center py-2 px-2">
                                   <span className={isDarkMode ? 'text-violet-400' : 'text-violet-600'}>{player.smartMatchGames}</span>
                                 </td>
-                                <td className="text-center py-2 px-2">{player.noSmartMatchGames}</td>
                                 <td className={`text-center py-2 px-1 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
                                   {player.waitUnder20 || '—'}
                                 </td>
@@ -1389,10 +1464,7 @@ const ReportsModal = ({
                   )}
 
                   {/* Gender Combinations */}
-                  <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                    <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                      Gender Combinations
-                    </h3>
+                  <Card title="Gender Combinations">
                     <div className="grid grid-cols-4 gap-3">
                       {genderCombinations.map(({ combo, count }) => (
                         <div key={combo} className={`rounded-lg p-3 text-center ${
@@ -1403,16 +1475,12 @@ const ReportsModal = ({
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </Card>
 
                   {/* Level Combinations */}
-                  <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                    <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                      Level Combinations
-                    </h3>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <Card title="Level Combinations">
+                    <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
                       {levelCombinations.map(({ combo, count }) => {
-                        // Color code each level in the combo
                         const coloredCombo = combo.split(' / ').map((level, idx) => {
                           let colorClass = '';
                           if (level === 'Expert') colorClass = isDarkMode ? 'text-purple-400' : 'text-purple-600';
@@ -1436,14 +1504,14 @@ const ReportsModal = ({
                         );
                       })}
                     </div>
-                  </div>
+                  </Card>
 
                   {/* Daily Statistics - Always show */}
                   <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
                     <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
                       Daily Statistics
                     </h3>
-                    <div className="space-y-4 max-h-64 overflow-y-auto">
+                    <div className="space-y-4 max-h-96 overflow-y-auto custom-scrollbar pr-1">
                       {dateStats.map(({ date, totalGames, gameCountGroups }) => (
                         <div key={date} className={`rounded-lg p-3 ${isDarkMode ? 'bg-slate-700/50' : 'bg-white border border-slate-200'}`}>
                           <div className="flex justify-between items-center mb-2">
@@ -1477,7 +1545,7 @@ const ReportsModal = ({
                         No smart match data available
                       </p>
                     ) : (
-                      <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                      <div className="grid grid-cols-3 gap-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
                         {smartMatchStats.map(({ name, gender, level, count }) => (
                           <div key={name} className={`flex justify-between items-center rounded-lg px-3 py-2 ${
                             isDarkMode ? 'bg-slate-700/50' : 'bg-white border border-slate-200'
@@ -1510,17 +1578,17 @@ const ReportsModal = ({
               <div className={`w-64 flex-shrink-0 border-r overflow-hidden flex flex-col ${
                 isDarkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'
               }`}>
-                <div className="p-3">
+                <div className="p-2.5">
                   <input
                     type="text"
                     value={playerSearchTerm}
                     onChange={(e) => setPlayerSearchTerm(e.target.value)}
                     placeholder="Search players..."
-                    className={`w-full px-3 py-2 rounded-lg text-sm ${
+                    className={`w-full px-2.5 py-1 rounded-lg text-xs ${
                       isDarkMode 
                         ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-500' 
                         : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'
-                    } border focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                    } border focus:outline-none focus:ring-1 focus:ring-violet-500`}
                   />
                   {selectedDate !== 'all' && (
                     <p className={`text-xs mt-2 ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>

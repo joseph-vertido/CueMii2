@@ -187,8 +187,8 @@ const MatchHistoryModal = ({ isOpen, onClose, matchHistory, clearHistory, isDark
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`neon-panel rounded-2xl border w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl ${
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className={`neon-panel rounded-2xl border w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl ${
         isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
       }`}>
         {/* Header - Compact */}
@@ -226,7 +226,8 @@ const MatchHistoryModal = ({ isOpen, onClose, matchHistory, clearHistory, isDark
             <div className="flex items-center gap-2">
               <span className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Date:</span>
               <ThemedSelect
-                className="w-40 flex-none"
+                className="w-36 flex-none"
+                compact
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
                 isDarkMode={isDarkMode}
@@ -298,10 +299,10 @@ const MatchHistoryModal = ({ isOpen, onClose, matchHistory, clearHistory, isDark
               {sortedHistory.map((match, index) => (
                 <div
                   key={`${match.id}-${index}`}
-                  className={`rounded-lg border px-3 py-2 ${
+                  className={`history-row rounded-lg border px-3 py-2 ${
                     match.status === 'completed'
-                      ? isDarkMode ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-emerald-50 border-emerald-300'
-                      : isDarkMode ? 'bg-red-900/20 border-red-500/30' : 'bg-red-50 border-red-300'
+                      ? `history-row-completed ${isDarkMode ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-emerald-50 border-emerald-300'}`
+                      : `history-row-deleted ${isDarkMode ? 'bg-red-900/20 border-red-500/30' : 'bg-red-50 border-red-300'}`
                   }`}
                 >
                   {/* Single Row Layout */}
@@ -359,7 +360,7 @@ const MatchHistoryModal = ({ isOpen, onClose, matchHistory, clearHistory, isDark
                           <div
                             key={`empty-${i}`}
                             className={`flex-1 rounded px-2 py-1 text-center text-xs border border-dashed ${
-                              isDarkMode ? 'bg-slate-800/30 border-slate-700 text-slate-600' : 'bg-slate-50 border-slate-300 text-slate-400'
+                              isDarkMode ? 'history-empty bg-slate-800/30 border-slate-700 text-slate-600' : 'bg-slate-50 border-slate-300 text-slate-400'
                             }`}
                           >
                             —

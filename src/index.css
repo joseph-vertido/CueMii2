@@ -90,15 +90,24 @@ body {
   scrollbar-color: rgba(71, 85, 105, 0.75) rgba(2, 6, 23, 0.6);
 }
 
-/* Pulsating glow for newly assigned courts.
-   Matches the soft two-layer glow used by the player pool cards (no hard
-   spread ring, which read as a solid expanding band). */
+/* Newly assigned court: the card's BACKGROUND breathes rather than the card
+   giving off an outer glow.
+
+   Done with a very large inset shadow, which washes the whole interior in a
+   faint green. An inset shadow paints above the background but below the
+   card's content, so the text stays clean — and unlike a pseudo-element
+   overlay it can't sit on top of the players or buttons. The card's normal
+   elevation shadow is carried along so it isn't lost while animating. */
 @keyframes pulse-border {
   0%, 100% {
-    box-shadow: 0 0 4px rgba(250, 204, 21, 0.5), 0 0 8px rgba(250, 204, 21, 0.3);
+    box-shadow:
+      inset 0 0 0 9999px rgba(16, 185, 129, 0),
+      0 4px 12px -8px rgba(0, 0, 0, 0.8);
   }
-  50% {
-    box-shadow: 0 0 10px rgba(250, 204, 21, 0.7), 0 0 20px rgba(250, 204, 21, 0.5);
+  35%, 65% {
+    box-shadow:
+      inset 0 0 0 9999px rgba(16, 185, 129, 0.24),
+      0 4px 12px -8px rgba(0, 0, 0, 0.8);
   }
 }
 
@@ -111,11 +120,11 @@ body {
 @keyframes pulse-dot-assigned {
   0%, 100% {
     background-color: #06b6d4; /* cyan-500 */
-    box-shadow: 0 0 0 rgba(250, 204, 21, 0);
+    box-shadow: 0 0 0 rgba(16, 185, 129, 0);
   }
-  50% {
-    background-color: #facc15; /* yellow-400 */
-    box-shadow: 0 0 6px rgba(250, 204, 21, 0.8);
+  35%, 65% {
+    background-color: #10b981; /* emerald-500 */
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.95);
   }
 }
 
@@ -125,12 +134,14 @@ body {
 
 /* Pulsating glow for smart matched players.
    Matches the soft two-layer halo used by the player pool cards. */
+/* Smart-matched players: the card's own surface breathes, matching the way a
+   newly assigned court is highlighted, rather than casting an outer glow. */
 @keyframes pulse-smart-match {
   0%, 100% {
-    box-shadow: 0 0 4px rgba(251, 191, 36, 0.5), 0 0 8px rgba(251, 191, 36, 0.3);
+    box-shadow: inset 0 0 0 9999px rgba(251, 191, 36, 0);
   }
   50% {
-    box-shadow: 0 0 10px rgba(251, 191, 36, 0.7), 0 0 20px rgba(251, 191, 36, 0.5);
+    box-shadow: inset 0 0 0 9999px rgba(251, 191, 36, 0.15);
   }
 }
 
@@ -139,12 +150,19 @@ body {
 }
 
 /* Pulsating red border animation for returned matches */
+/* A match just returned from a court. Only the interior breathes — the red
+   border stays put and there's no outer glow. (Neon overrides this below, where
+   a glow reads well against the dark panel.) */
 @keyframes pulse-returned {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.9), 0 0 10px rgba(239, 68, 68, 0.7);
+    box-shadow:
+      0 0 4px rgba(239, 68, 68, 0.25),
+      inset 0 0 0 9999px rgba(239, 68, 68, 0);
   }
   50% {
-    box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.5), 0 0 20px rgba(239, 68, 68, 0.9);
+    box-shadow:
+      0 0 10px rgba(239, 68, 68, 0.4),
+      inset 0 0 0 9999px rgba(239, 68, 68, 0.12);
   }
 }
 
@@ -153,12 +171,19 @@ body {
 }
 
 /* Pulsating green border animation for priority matches */
+/* Higher-priority match. Softer than the old hard 5px ring, and the inset layer
+   washes the card's interior so the background breathes with the border — it's
+   one animation, so they can't drift apart. */
 @keyframes pulse-priority {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.9), 0 0 10px rgba(16, 185, 129, 0.7);
+    box-shadow:
+      0 0 4px rgba(16, 185, 129, 0.25),
+      inset 0 0 0 9999px rgba(16, 185, 129, 0);
   }
   50% {
-    box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.5), 0 0 20px rgba(16, 185, 129, 0.9);
+    box-shadow:
+      0 0 10px rgba(16, 185, 129, 0.4),
+      inset 0 0 0 9999px rgba(16, 185, 129, 0.12);
   }
 }
 
@@ -259,8 +284,8 @@ body {
 /* Newly assigned court: top strip alternates between the live cyan and yellow
    on the same 1.5s cycle as the card glow and status dot. */
 @keyframes pulse-strip-assigned {
-  0%, 100% { background-color: #06b6d4; }
-  50%      { background-color: #facc15; }
+  0%, 100%   { background-color: #06b6d4; }
+  35%, 65% { background-color: #10b981; }
 }
 
 .animate-strip-assigned {
@@ -356,9 +381,9 @@ body {
 .neon .bg-amber-700,
 .neon .bg-amber-800 {
   background-color: #1e1206;
-  border: 1px solid rgba(251, 146, 60, 0.6);
-  color: #ffb066;
-  box-shadow: 0 0 12px rgba(251, 146, 60, 0.28);
+  border: 1px solid rgba(253, 186, 116, 0.95);
+  color: #ffc999;
+  box-shadow: 0 0 12px rgba(251, 146, 60, 0.35);
 }
 
 .neon .bg-red-600 {
@@ -382,10 +407,6 @@ body {
   filter: saturate(1.3) brightness(1.12);
 }
 
-/* --- Theme toggle itself --------------------------------------- */
-.neon .theme-toggle {
-  box-shadow: 0 0 12px rgba(34, 211, 238, 0.35);
-}
 
 /* --- Neon: player pool & match queue --------------------------- */
 
@@ -430,14 +451,17 @@ body {
 .neon .text-blue-300 { color: #7dd8ff; }
 .neon .text-pink-300 { color: #ff8fd4; }
 
-/* Level badges outline instead of filling */
-.neon .rounded-full.border {
+/* Level badges outline instead of filling.
+   Scoped to <span> so it doesn't also glow the rounded search input, which
+   shares the rounded-full + border classes (that produced a static grey halo
+   picked up from the input's text colour). */
+.neon span.rounded-full.border {
   box-shadow: 0 0 8px -2px currentColor;
 }
 
-/* Search field and dropdown triggers get a lit edge on focus */
-.neon input:focus,
-.neon .theme-toggle:focus {
+/* Search fields get a lit edge on focus. The theme toggle used to be included
+   here, which left it glowing after it had been clicked. */
+.neon input:focus {
   box-shadow: 0 0 12px -2px rgba(34, 211, 238, 0.7);
   border-color: rgba(34, 211, 238, 0.7);
 }
@@ -539,7 +563,9 @@ body {
 }
 
 /* Higher-priority flash */
-.neon .queue-card.border-emerald-500 {
+/* Matches the softened border class the priority state now uses — the old
+   selector stopped matching when it changed to border-emerald-500/70. */
+.neon .queue-card.animate-pulse-priority {
   background-color: #04231a;
   border-color: #34d399;
   box-shadow: 0 0 20px -5px rgba(52, 211, 153, 0.6);
@@ -563,4 +589,804 @@ body {
 .neon .queue-card.border-orange-500 {
   border-color: #fb923c;
   box-shadow: 0 0 18px -5px rgba(251, 146, 60, 0.6);
+}
+
+/* Player Database window: a slightly thicker scrollbar, since its table is the
+   longest scrolling list in the app. */
+.player-db-scroll::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+/* --- Neon: glowing panel header icon + lit top-left corner ------------- */
+
+/* The icon badge becomes a lit tile: bright border, inner and outer glow. */
+.neon .panel-icon {
+  background-color: #03212b !important;
+  border: 1px solid rgba(34, 211, 238, 0.65);
+  box-shadow:
+    0 0 14px rgba(34, 211, 238, 0.45),
+    inset 0 0 12px -4px rgba(34, 211, 238, 0.5);
+}
+
+.neon .panel-icon svg {
+  color: #5ff5ff !important;
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.9));
+}
+
+/* Match queue keeps its amber identity */
+.neon .panel-icon-amber {
+  background-color: #2a1705 !important;
+  border-color: rgba(251, 146, 60, 0.65);
+  box-shadow:
+    0 0 14px rgba(251, 146, 60, 0.4),
+    inset 0 0 12px -4px rgba(251, 146, 60, 0.5);
+}
+
+.neon .panel-icon-amber svg {
+  color: #ffb066 !important;
+  filter: drop-shadow(0 0 5px rgba(251, 146, 60, 0.9));
+}
+
+/* A soft light source bleeding in from the panel's top-left corner. */
+.neon .panel-depth {
+  position: relative;
+}
+
+.neon .panel-depth::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 220px;
+  height: 130px;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    ellipse at top left,
+    rgba(34, 211, 238, 0.16),
+    transparent 70%
+  );
+}
+
+/* Keep panel content above that wash */
+.neon .panel-depth > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- Neon: the small check / add buttons on pool cards ----------------- */
+.neon .neon-check-btn {
+  background-color: #032013 !important;
+  border: 1px solid rgba(74, 222, 128, 0.7);
+  color: #6ef7a0 !important;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.35);
+}
+
+.neon .neon-check-btn:hover {
+  background-color: #05301d !important;
+  box-shadow: 0 0 16px rgba(74, 222, 128, 0.55);
+}
+
+.neon .neon-check-btn svg {
+  filter: drop-shadow(0 0 4px rgba(74, 222, 128, 0.9));
+}
+
+.neon .neon-add-btn {
+  background-color: #031a20 !important;
+  border: 1px solid rgba(34, 211, 238, 0.7);
+  color: #5ff5ff !important;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.35);
+}
+
+.neon .neon-add-btn:hover {
+  background-color: #05262e !important;
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.55);
+}
+
+.neon .neon-add-btn svg {
+  filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.9));
+}
+
+/* Neon: the Not Present picker keeps its red identity */
+.neon .neon-add-btn-red {
+  background-color: #200610 !important;
+  border: 1px solid rgba(244, 63, 94, 0.7);
+  color: #ff8fa3 !important;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.35);
+}
+
+.neon .neon-add-btn-red:hover {
+  background-color: #2e0a18 !important;
+  box-shadow: 0 0 16px rgba(244, 63, 94, 0.55);
+}
+
+.neon .neon-add-btn-red svg {
+  filter: drop-shadow(0 0 4px rgba(244, 63, 94, 0.9));
+}
+
+/* --- Neon: fading gradient border on waiting player cards --------------
+   Two stacked background images: the first paints the card surface inside the
+   padding box, the second paints the border box — so the border itself becomes
+   a gradient.
+
+   The gradient runs at 135deg (top-left to bottom-right), so it is brightest at
+   the upper-left and lower-right corners. The other two corners sit at the
+   midpoint of that axis and dim down — but never to nothing, so the whole
+   outline stays visible. */
+.neon .wait-border {
+  border-color: transparent !important;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+.neon .wait-border-green {
+  background-image:
+    linear-gradient(#071612, #071612),
+    linear-gradient(135deg,
+      rgba(74, 222, 128, 1) 0%,
+      rgba(74, 222, 128, 0.42) 28%,
+      rgba(74, 222, 128, 0.10) 50%,
+      rgba(74, 222, 128, 0.42) 72%,
+      rgba(74, 222, 128, 1) 100%);
+}
+
+.neon .wait-border-yellow {
+  background-image:
+    linear-gradient(#15130b, #15130b),
+    linear-gradient(135deg,
+      rgba(250, 204, 21, 1) 0%,
+      rgba(250, 204, 21, 0.42) 28%,
+      rgba(250, 204, 21, 0.10) 50%,
+      rgba(250, 204, 21, 0.42) 72%,
+      rgba(250, 204, 21, 1) 100%);
+}
+
+.neon .wait-border-red {
+  background-image:
+    linear-gradient(#160b11, #160b11),
+    linear-gradient(135deg,
+      rgba(244, 63, 94, 1) 0%,
+      rgba(244, 63, 94, 0.42) 28%,
+      rgba(244, 63, 94, 0.10) 50%,
+      rgba(244, 63, 94, 0.42) 72%,
+      rgba(244, 63, 94, 1) 100%);
+}
+
+
+/* --- Light / Dark: a very subtle wash matching the wait-time border -------
+   Applied as a background-image layer so it sits over the card's existing
+   background colour instead of replacing it. The neon rules above are more
+   specific, so they keep their tinted surface. */
+.wait-border-green {
+  background-image: linear-gradient(rgba(74, 222, 128, 0.07), rgba(74, 222, 128, 0.07));
+}
+
+.wait-border-yellow {
+  background-image: linear-gradient(rgba(250, 204, 21, 0.07), rgba(250, 204, 21, 0.07));
+}
+
+.wait-border-red {
+  background-image: linear-gradient(rgba(244, 63, 94, 0.07), rgba(244, 63, 94, 0.07));
+}
+
+/* Neon: the remove (X) button on Not Present cards, paired with the check */
+.neon .neon-remove-btn {
+  background-color: #200610 !important;
+  border: 1px solid rgba(244, 63, 94, 0.7);
+  color: #ff8fa3 !important;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.35);
+}
+
+.neon .neon-remove-btn:hover {
+  background-color: #2e0a18 !important;
+  box-shadow: 0 0 16px rgba(244, 63, 94, 0.55);
+}
+
+.neon .neon-remove-btn svg {
+  filter: drop-shadow(0 0 4px rgba(244, 63, 94, 0.9));
+}
+
+/* --- Neon: section headers match their add button's colour --------------
+   Available picks up the cyan of its "+" button, Not Present the red of its
+   own, so each header, dot and button read as one group. */
+.neon .head-available h3 {
+  color: #5ff5ff !important;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.45);
+}
+
+.neon .head-available .head-dot {
+  background-color: #22d3ee !important;
+  box-shadow: 0 0 8px #22d3ee;
+}
+
+.neon .head-notpresent .head-notpresent-title {
+  color: #f43f5e !important;
+  text-shadow: 0 0 8px rgba(244, 63, 94, 0.5);
+}
+
+.neon .head-notpresent .head-dot {
+  background-color: #f43f5e !important;
+  box-shadow: 0 0 8px #f43f5e;
+}
+
+/* --- Neon: Player Database action buttons and status pills --------------
+   The tinted fills these use in dark mode read as light blocks against the
+   neon panel, so they drop to a near-black base and rely on a bright outline
+   plus a lit icon instead. */
+.neon .neon-panel .db-action-btn {
+  background-color: #05080f !important;
+  border: 1px solid currentColor;
+  box-shadow: 0 0 9px -3px currentColor;
+}
+
+.neon .neon-panel .db-action-btn:hover {
+  background-color: #0a1119 !important;
+  box-shadow: 0 0 14px -3px currentColor;
+}
+
+.neon .neon-panel .db-action-btn svg {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+/* "Stored" / "In Pool" and their empty counterparts become lit outlines */
+.neon .neon-panel .db-pill {
+  background-color: #05080f !important;
+  border: 1px solid currentColor;
+  box-shadow: 0 0 8px -2px currentColor, inset 0 0 8px -6px currentColor;
+}
+
+/* --- Neon: the Available / Not Present player picker --------------------
+   Rendered through a portal into <body>, which is why App mirrors the theme
+   classes onto the body element. */
+.neon .picker-panel {
+  background-color: #080d16 !important;
+  border-color: rgba(34, 211, 238, 0.35) !important;
+  box-shadow:
+    0 0 26px -8px rgba(34, 211, 238, 0.5),
+    inset 0 0 22px -16px rgba(34, 211, 238, 0.8);
+}
+
+.neon .picker-panel input {
+  background-color: #02060c !important;
+  border-color: rgba(34, 211, 238, 0.28) !important;
+}
+
+.neon .picker-panel .bg-cyan-600 {
+  background-color: #05323d !important;
+  border: 1px solid rgba(34, 211, 238, 0.7);
+  color: #5ff5ff !important;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.4);
+}
+
+.neon .picker-panel button:hover {
+  background-color: rgba(34, 211, 238, 0.08);
+}
+
+/* --- Neon: Match History rows -----------------------------------------
+   The completed / deleted tints read as washed-out blocks against the neon
+   panel, so each row drops to a deep base with a lit edge instead. */
+.neon .history-row {
+  background-color: #05080f !important;
+  box-shadow: inset 0 0 18px -14px currentColor;
+}
+
+.neon .history-row-completed {
+  border-color: rgba(52, 211, 153, 0.55) !important;
+  box-shadow:
+    0 0 12px -6px rgba(52, 211, 153, 0.6),
+    inset 0 0 22px -16px rgba(52, 211, 153, 0.9);
+}
+
+.neon .history-row-deleted {
+  border-color: rgba(244, 63, 94, 0.5) !important;
+  box-shadow:
+    0 0 12px -6px rgba(244, 63, 94, 0.55),
+    inset 0 0 22px -16px rgba(244, 63, 94, 0.9);
+}
+
+/* Match number, status dot and the small chips inside a row */
+.neon .history-row .bg-orange-500\/20 {
+  background-color: #1c1206 !important;
+  border: 1px solid rgba(251, 146, 60, 0.55);
+  color: #ffb066 !important;
+  box-shadow: 0 0 8px -2px rgba(251, 146, 60, 0.6);
+}
+
+.neon .history-row .bg-emerald-500\/20,
+.neon .history-row .bg-green-500\/20 {
+  background-color: #04231a !important;
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  box-shadow: 0 0 8px -2px rgba(52, 211, 153, 0.6);
+}
+
+.neon .history-row .bg-red-500\/20 {
+  background-color: #200610 !important;
+  border: 1px solid rgba(244, 63, 94, 0.5);
+  box-shadow: 0 0 8px -2px rgba(244, 63, 94, 0.6);
+}
+
+/* Empty player slots stay quiet */
+.neon .history-row .history-empty {
+  background-color: #02060c !important;
+  border-color: rgba(34, 211, 238, 0.16) !important;
+}
+
+/* ===============================================================
+   MOTION
+   Tier 1: cards settle in / leave. Tier 2 (the flying ghost) and
+   tier 3 (FLIP reordering) are driven from JS but share this easing.
+   =============================================================== */
+
+:root {
+  --motion-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes card-settle {
+  0%   { opacity: 0; transform: scale(0.9) translateY(-4px); }
+  60%  { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-card-settle {
+  animation: card-settle 0.32s var(--motion-ease) both;
+}
+
+@keyframes slot-fill {
+  0%   { opacity: 0; transform: scale(0.86); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-slot-fill {
+  animation: slot-fill 0.28s var(--motion-ease) both;
+}
+
+/* The ghost that flies between panels (tier 2) */
+.flight-ghost {
+  position: fixed;
+  z-index: 95;
+  pointer-events: none;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.7);
+}
+
+/* Respect users who ask for less motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-card-settle,
+  .animate-slot-fill {
+    animation: none;
+  }
+  .flight-ghost {
+    display: none;
+  }
+}
+
+/* Dropdown panels ease open instead of appearing instantly. transform-origin is
+   set per panel in JS, so one opening upward grows from its bottom edge. */
+@keyframes panel-open {
+  0%   { opacity: 0; transform: scale(0.95) translateY(-6px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-panel-open {
+  animation: panel-open 0.18s var(--motion-ease) both;
+}
+
+@keyframes panel-open-up {
+  0%   { opacity: 0; transform: scale(0.95) translateY(6px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-panel-open-up {
+  animation: panel-open-up 0.18s var(--motion-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-panel-open,
+  .animate-panel-open-up {
+    animation: none;
+  }
+}
+
+/* Dropdown exit, mirroring the opening animation */
+@keyframes panel-close {
+  0%   { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.95) translateY(-6px); }
+}
+
+.animate-panel-close {
+  animation: panel-close 0.14s var(--motion-ease) both;
+}
+
+@keyframes panel-close-up {
+  0%   { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.95) translateY(6px); }
+}
+
+.animate-panel-close-up {
+  animation: panel-close-up 0.14s var(--motion-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-panel-close,
+  .animate-panel-close-up {
+    animation: none;
+  }
+}
+
+/* The "new player" column sliding out of the picker's right edge */
+@keyframes create-column-in {
+  0%   { opacity: 0; transform: translateX(-12px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+.animate-create-in {
+  animation: create-column-in 0.2s var(--motion-ease) both;
+}
+
+@keyframes create-column-out {
+  0%   { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(-12px); }
+}
+
+.animate-create-out {
+  animation: create-column-out 0.16s var(--motion-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-create-in,
+  .animate-create-out {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Player cards that are in a match or on court: washed out, since
+   they can't be dragged or acted on from the pool.
+   --------------------------------------------------------------- */
+.card-in-play {
+  cursor: default;
+  /* Light: wash toward white rather than fading into the panel behind. */
+  filter: saturate(0.3) brightness(1.12) opacity(0.72);
+}
+
+/* Dark and Neon: fading is the right effect, since the page behind is darker. */
+.dark .card-in-play {
+  filter: saturate(0.45) opacity(0.55);
+}
+
+/* Nothing inside should look interactive either */
+.card-in-play * {
+  cursor: default;
+}
+
+/* --- Neon: section-tinted borders ------------------------------ */
+.neon .card-not-present {
+  border-color: rgba(244, 63, 94, 0.45) !important;
+}
+
+.neon .card-not-present:hover {
+  border-color: rgba(244, 63, 94, 0.7) !important;
+  box-shadow: 0 0 12px -4px rgba(244, 63, 94, 0.6);
+}
+
+.neon .card-in-queue {
+  border-color: rgba(250, 204, 21, 0.45) !important;
+}
+
+.neon .card-in-court {
+  border-color: rgba(52, 211, 153, 0.45) !important;
+}
+
+/* In-play cards aren't interactive, so they don't light up on hover */
+.neon .card-in-play:hover {
+  box-shadow: none;
+}
+
+.neon .card-in-queue:hover {
+  border-color: rgba(250, 204, 21, 0.45) !important;
+}
+
+.neon .card-in-court:hover {
+  border-color: rgba(52, 211, 153, 0.45) !important;
+}
+
+/* Neon: the selected level in the new-player form sits darker than the
+   "Add player" button, so the two don't read as the same control. */
+.neon .picker-panel .bg-cyan-500\/25 {
+  background-color: #04222b !important;
+  border-color: rgba(34, 211, 238, 0.55) !important;
+  color: #7ee9f5 !important;
+  box-shadow: none;
+}
+
+/* Neon: smart-matched slots keep the yellow border they have in Dark Mode, and
+   glow a little more strongly than the default fill. */
+.neon .animate-smart-match {
+  border-color: rgba(250, 204, 21, 0.5) !important;
+  animation: pulse-smart-match-neon 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-smart-match-neon {
+  0%, 100% {
+    box-shadow: inset 0 0 0 9999px rgba(251, 191, 36, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 0 9999px rgba(251, 191, 36, 0.15);
+  }
+}
+
+/* ---------------------------------------------------------------
+   A pool search that narrows to a single player pulses that player
+   green *where they actually are* — in their slot on a court or in
+   the match queue — so you can find them at a glance.
+   --------------------------------------------------------------- */
+@keyframes pulse-search-found {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 0 9999px rgba(16, 185, 129, 0.05),
+      0 0 6px -3px rgba(16, 185, 129, 0.5);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 9999px rgba(16, 185, 129, 0.3),
+      0 0 16px -3px rgba(16, 185, 129, 0.9);
+  }
+}
+
+.card-search-found {
+  animation: pulse-search-found 1.4s ease-in-out infinite;
+  border-color: rgba(16, 185, 129, 0.85) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-search-found {
+    animation: none;
+    box-shadow: inset 0 0 0 9999px rgba(16, 185, 129, 0.18);
+  }
+}
+
+/* Header menu unrolling from the top */
+@keyframes menu-expand {
+  0%   { opacity: 0; transform: scaleY(0.6) translateY(-6px); }
+  100% { opacity: 1; transform: scaleY(1) translateY(0); }
+}
+
+.animate-menu-expand {
+  transform-origin: top center;
+  animation: menu-expand 0.16s var(--motion-ease) both;
+}
+
+@keyframes menu-collapse {
+  0%   { opacity: 1; transform: scaleY(1) translateY(0); }
+  100% { opacity: 0; transform: scaleY(0.6) translateY(-6px); }
+}
+
+.animate-menu-collapse {
+  transform-origin: top center;
+  animation: menu-collapse 0.13s var(--motion-ease) both;
+}
+
+/* A newly created court easing in rather than popping */
+@keyframes court-appear {
+  0%   { opacity: 0; transform: scale(0.9) translateY(-6px); }
+  60%  { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-court-appear {
+  animation: court-appear 0.42s var(--motion-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-menu-expand,
+  .animate-menu-collapse,
+  .animate-court-appear {
+    animation: none;
+  }
+}
+
+/* A bouncing arrow pointing at the found player.
+   Same 1.4s ease-in-out cycle as the glow, and it reaches full extension at the
+   same 50% mark, so the two move together. Drawn as a pseudo-element so it
+   works everywhere the highlight is used — pool card, Not Present card, match
+   slot and court row — without touching any of those components. */
+@keyframes search-arrow-bounce {
+  0%, 100% {
+    transform: translateY(-50%) translateX(0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-50%) translateX(5px);
+    opacity: 1;
+  }
+}
+
+.card-search-found {
+  position: relative;
+  /* Room for the arrow, so it never sits on top of the player's name */
+  padding-left: 1.35rem !important;
+}
+
+.card-search-found::before {
+  content: '';
+  position: absolute;
+  /* Clear of the gender accent bar on a match-queue slot */
+  left: 0.45rem;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid #10b981;
+  filter: drop-shadow(0 0 3px rgba(16, 185, 129, 0.8));
+  animation: search-arrow-bounce 1.4s ease-in-out infinite;
+}
+
+.neon .card-search-found::before {
+  border-left-color: #6ef7a0;
+  filter: drop-shadow(0 0 5px rgba(110, 247, 160, 0.9));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-search-found::before {
+    animation: none;
+    transform: translateY(-50%) translateX(3px);
+    opacity: 1;
+  }
+}
+
+/* Neon: the Not Present picker button, in the section's grey */
+.neon .neon-add-btn-slate {
+  background-color: #0b1119 !important;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  color: #cbd5e1 !important;
+  box-shadow: 0 0 10px rgba(148, 163, 184, 0.22);
+}
+
+.neon .neon-add-btn-slate:hover {
+  background-color: #131b26 !important;
+  box-shadow: 0 0 16px rgba(148, 163, 184, 0.4);
+}
+
+.neon .neon-add-btn-slate svg {
+  filter: drop-shadow(0 0 4px rgba(148, 163, 184, 0.8));
+}
+
+/* Neon: Not Present cards and header follow the grey theme */
+.neon .card-not-present {
+  border-color: rgba(148, 163, 184, 0.35) !important;
+}
+
+.neon .card-not-present:hover {
+  border-color: rgba(148, 163, 184, 0.6) !important;
+  box-shadow: 0 0 12px -4px rgba(148, 163, 184, 0.5);
+}
+
+.neon .head-notpresent .head-notpresent-title {
+  color: #cbd5e1 !important;
+  text-shadow: 0 0 8px rgba(148, 163, 184, 0.4);
+}
+
+.neon .head-notpresent .head-dot {
+  background-color: #94a3b8 !important;
+  box-shadow: 0 0 8px #94a3b8;
+}
+
+/* Neon: the Not In Pool section — red header, blue check, grey add */
+.neon .head-notinpool-title {
+  color: #ff6b85 !important;
+  text-shadow: 0 0 8px rgba(244, 63, 94, 0.5);
+}
+
+.neon .head-notinpool-dot {
+  background-color: #f43f5e !important;
+  box-shadow: 0 0 8px #f43f5e;
+}
+
+.neon .neon-check-btn-blue {
+  background-color: #05142b !important;
+  border: 1px solid rgba(96, 165, 250, 0.7);
+  color: #93c5fd !important;
+  box-shadow: 0 0 10px rgba(96, 165, 250, 0.35);
+}
+
+.neon .neon-check-btn-blue:hover {
+  background-color: #0a1e3d !important;
+  box-shadow: 0 0 16px rgba(96, 165, 250, 0.55);
+}
+
+.neon .neon-check-btn-blue svg {
+  filter: drop-shadow(0 0 4px rgba(96, 165, 250, 0.9));
+}
+
+
+/* Neon: a returned match gets a slightly deeper red wash, since the panel
+   behind it is much darker. */
+.neon .animate-pulse-returned {
+  animation: pulse-returned-neon 1s ease-in-out infinite;
+}
+
+@keyframes pulse-returned-neon {
+  0%, 100% {
+    box-shadow:
+      0 0 6px -2px rgba(244, 63, 94, 0.45),
+      inset 0 0 0 9999px rgba(244, 63, 94, 0.04);
+  }
+  50% {
+    box-shadow:
+      0 0 18px -2px rgba(244, 63, 94, 0.8),
+      inset 0 0 0 9999px rgba(244, 63, 94, 0.18);
+  }
+}
+
+
+/* A newly created match easing into the queue */
+@keyframes match-appear {
+  0%   { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  60%  { opacity: 1; transform: translateY(0) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-match-appear {
+  animation: match-appear 0.38s var(--motion-ease) both;
+}
+
+/* Light mode: smart-matched players glow orange, which reads far better on a
+   white card than the pale yellow did. */
+@keyframes pulse-smart-match-light {
+  0%, 100% { box-shadow: inset 0 0 0 9999px rgba(249, 115, 22, 0); }
+  50%      { box-shadow: inset 0 0 0 9999px rgba(249, 115, 22, 0.22); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-match-appear { animation: none; }
+}
+
+.animate-smart-match-light {
+  animation: pulse-smart-match-light 1.5s ease-in-out infinite;
+}
+
+
+/* Neon: a deeper green wash on a higher-priority match, to read against the
+   darker panel. */
+.neon .animate-pulse-priority {
+  animation: pulse-priority-neon 1s ease-in-out infinite;
+}
+
+@keyframes pulse-priority-neon {
+  0%, 100% {
+    box-shadow:
+      0 0 6px -2px rgba(16, 185, 129, 0.45),
+      inset 0 0 0 9999px rgba(16, 185, 129, 0.04);
+  }
+  50% {
+    box-shadow:
+      0 0 18px -2px rgba(16, 185, 129, 0.8),
+      inset 0 0 0 9999px rgba(16, 185, 129, 0.18);
+  }
+}
+
+/* The Match Queue's "Top" button drifting up and down so it catches the eye.
+   Separate from bounce-subtle, which carries a horizontal offset for elements
+   centred with a transform — this button is centred by its flex row. */
+@keyframes bounce-top-button {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+
+.animate-bounce-top {
+  animation: bounce-top-button 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bounce-top { animation: none; }
 }

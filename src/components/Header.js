@@ -1,4 +1,6 @@
 import React from 'react';
+import HeaderMenu from './HeaderMenu';
+import NotificationBell from './NotificationBell';
 import { APP_VERSION } from '../data/initialData';
 import { getDaysUntilExpiration } from '../utils/licenseUtils';
 
@@ -32,7 +34,11 @@ const Header = ({
   licenseInfo,
   syncStatus = 'idle',
   isOnline = true,
-  cloudSyncEnabled = false
+  cloudSyncEnabled = false,
+  playerCount = 0,
+  onClearTimers,
+  canClearTimers = true,
+  readerStatus = 'unknown'
 }) => {
   const daysLeft = licenseInfo?.expirationDate ? getDaysUntilExpiration(licenseInfo.expirationDate) : null;
   const showWarning = daysLeft !== null && daysLeft <= 30;
@@ -97,67 +103,39 @@ const Header = ({
             className="h-10 w-auto object-contain"
           />
           <div className={`h-8 w-px ${isDarkMode ? 'bg-slate-700' : 'bg-slate-300'}`} />
-          <div>
-            <p className={`font-bold tracking-wide text-xl ${isDarkMode ? 'text-pink-400' : 'text-pink-600'}`}>CueMii App</p>
-            <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Created by Joseph Vertido (jrvertido@gmail.com) · v{APP_VERSION}</p>
-          </div>
+          <img
+            src="/cuemii-logo.png"
+            alt="CueMii"
+            className="h-9 w-auto object-contain"
+          />
+          <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            Created by Joseph Vertido (jrvertido@gmail.com) · v{APP_VERSION}
+          </p>
         </div>
         
         <div className="flex items-center gap-2">
           {/* Cloud Sync Status Indicator */}
           {getSyncIndicator()}
           
-          {/* About Button with License Status */}
-          <button
-            onClick={onOpenAbout}
-            className={`p-2 rounded-lg font-semibold transition-all flex items-center gap-1 ${
-              isExpired
-                ? (isDarkMode
-                    ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/50 animate-pulse'
-                    : 'bg-red-100 hover:bg-red-200 text-red-700 border border-red-400 animate-pulse')
-                : showWarning
-                  ? (isDarkMode
-                      ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/50'
-                      : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-400')
-                  : isDarkMode 
-                    ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' 
-                    : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-300'
-            }`}
-            title={isExpired ? 'License Expired!' : showWarning ? `License expires in ${daysLeft} days` : 'About & License'}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {(isExpired || showWarning) && (
-              <span className="text-xs">{isExpired ? '!' : daysLeft}</span>
-            )}
-          </button>
-
-          {/* Settings Button */}
-          <button
-            onClick={onOpenSettings}
-            className={`p-2 rounded-lg font-semibold transition-all flex items-center gap-1 ${
-              isDarkMode 
-                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' 
-                : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-300'
-            }`}
-            title="Settings"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
+          {/* Notifications */}
+          <NotificationBell
+            isDarkMode={isDarkMode}
+            licenseInfo={licenseInfo}
+            playerCount={playerCount}
+            readerStatus={readerStatus}
+            isOnline={isOnline}
+            cloudSyncEnabled={cloudSyncEnabled}
+            syncStatus={syncStatus}
+            onOpenAbout={onOpenAbout}
+          />
 
           {/* Theme Toggle: Light -> Dark -> Neon */}
           <button
             onClick={toggleTheme}
             className={`theme-toggle p-2 rounded-lg font-semibold transition-all flex items-center gap-1 ${
-              theme === 'neon'
-                ? 'bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/60'
-                : theme === 'dark'
-                  ? 'bg-slate-700 hover:bg-slate-600 text-yellow-400'
-                  : 'bg-amber-100 hover:bg-amber-200 text-amber-600 border border-amber-300'
+              isDarkMode
+                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white'
+                : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-300'
             }`}
             title={
               theme === 'light' ? 'Switch to Dark Mode'
@@ -177,54 +155,13 @@ const Header = ({
               </svg>
             ) : (
               /* sun: next is light */
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="4" strokeWidth={2} />
+                <path strokeLinecap="round" strokeWidth={2} d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M4.93 19.07l1.41-1.41M16.66 6.34l1.41-1.41" />
               </svg>
             )}
           </button>
-          
-          <button
-            onClick={onOpenHistory}
-            className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
-              isDarkMode 
-                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white' 
-                : 'bg-slate-200 hover:bg-slate-300 text-slate-700 hover:text-slate-900 border border-slate-300'
-            }`}
-            title="View match history"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            History
-          </button>
-          <button
-            onClick={onOpenReports}
-            className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
-              isDarkMode 
-                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white' 
-                : 'bg-slate-200 hover:bg-slate-300 text-slate-700 hover:text-slate-900 border border-slate-300'
-            }`}
-            title="View reports and statistics"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            Reports
-          </button>
-          <button
-            onClick={onResetData}
-            className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${
-              isDarkMode 
-                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white' 
-                : 'bg-slate-200 hover:bg-slate-300 text-slate-700 hover:text-slate-900 border border-slate-300'
-            }`}
-            title="Reset all data"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Reset
-          </button>
+
           <button
             onClick={onOpenDatabase}
             className="bg-cyan-700 hover:bg-cyan-600 px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 text-white"
@@ -234,6 +171,19 @@ const Header = ({
             </svg>
             Manage Players
           </button>
+
+          {/* Overflow menu: Reports, History, Settings, About, Reset */}
+          <HeaderMenu
+            isDarkMode={isDarkMode}
+            onOpenReports={onOpenReports}
+            onOpenHistory={onOpenHistory}
+            onOpenSettings={onOpenSettings}
+            onOpenAbout={onOpenAbout}
+            onClearTimers={onClearTimers}
+            canClearTimers={canClearTimers}
+            onResetData={onResetData}
+          />
+
         </div>
       </div>
     </header>

@@ -3,6 +3,8 @@ import { showConfirm } from '../utils/appAlert';
 import { SKILL_LEVELS } from '../data/initialData';
 import { formatWaitTime, getWaitTimeColor, getWaitTimeColorLight } from '../utils/formatters';
 import LevelBadge from './LevelBadge';
+import AddPlayerMenu from './AddPlayerMenu';
+import useFlipList from '../hooks/useFlipList';
 import ThemedSelect from './ThemedSelect';
 
 /**
@@ -24,11 +26,15 @@ const PlayerPool = ({
   selectedMatch,
   addPlayerToMatch,
   selectedMatchId,
-  clearIdleTimes,
   onDropPlayerToPool,
   onDropPlayerToNotPresent,
   isDarkMode = true,
-  panelWidth = 450
+  panelWidth = 450,
+  allPlayers = [],
+  onAddToPool,
+  onAddToAvailable,
+  onCreatePlayer,
+  highlightPlayerId
 }) => {
   const searchInputRef = useRef(null);
   const [dragOverSection, setDragOverSection] = useState(null);
@@ -36,12 +42,15 @@ const PlayerPool = ({
   const [onCourtCollapsed, setOnCourtCollapsed] = useState(true); // Collapsed by default
 
   // Determine grid columns based on panel width
-  const gridCols = panelWidth < 350 ? 'grid-cols-1' : 'grid-cols-2';
+  // Two columns only while a card is still wide enough for its stats row.
+  // Below that the level badge, wait time and games counter start wrapping
+  // (the count dropping under its own icon), so drop to a single column.
+  const gridCols = panelWidth < 375 ? 'grid-cols-1' : 'grid-cols-2';
 
   // Filter pool players based on search and level filter
   const filteredPoolPlayers = poolPlayers
     .filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(poolSearch.toLowerCase());
+      const matchesSearch = p.name.toLowerCase().includes(poolSearch.trim().toLowerCase());
       const matchesLevel = poolLevelFilter === 'All' || p.level === poolLevelFilter;
       return matchesSearch && matchesLevel;
     });
@@ -49,7 +58,7 @@ const PlayerPool = ({
   // Filter not present players and sort alphabetically
   const filteredNotPresent = notPresentPlayers
     .filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(poolSearch.toLowerCase());
+      const matchesSearch = p.name.toLowerCase().includes(poolSearch.trim().toLowerCase());
       const matchesLevel = poolLevelFilter === 'All' || p.level === poolLevelFilter;
       return matchesSearch && matchesLevel;
     })
@@ -64,9 +73,76 @@ const PlayerPool = ({
     .filter(p => isPlayerInQueue(p.id))
     .sort((a, b) => a.joinedAt - b.joinedAt);
   
+  // The "+" pickers list every player in the database - nobody is removed once
+  // added - and report where each one currently sits so it's obvious at a glance.
+  const pickerPlayers = allPlayers;
+  const playerSectionStatus = (player) => {
+    if (notPresentPlayers.some(p => p.id === player.id)) return 'notPresent';
+    const inPool = poolPlayers.some(p => p.id === player.id);
+    if (!inPool) return null;
+    const busy = isPlayerInQueue?.(player.id) || isPlayerOnCourt?.(player.id);
+    return busy ? 'inMatch' : 'available';
+  };
+
+  // Players in the database who aren't in the pool at all. Only surfaced while
+  // searching, so the section stays out of the way during normal use.
+  const notInPoolMatches = (() => {
+    const q = poolSearch.trim().toLowerCase();
+    if (!q) return [];
+    const inPoolIds = new Set(poolPlayers.map(p => p.id));
+    const notPresentIds = new Set(notPresentPlayers.map(p => p.id));
+    return allPlayers
+      .filter(p => !inPoolIds.has(p.id) && !notPresentIds.has(p.id))
+      .filter(p => p.name.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  })();
+
+  // Players that have just appeared in the pool or Not Present get a settle-in
+  // animation.
+  //
+  // Worked out during the render, not in an effect: an effect runs after the
+  // first paint, so the card would show at full size for a frame before jumping
+  // back to the start of its animation.
+  const seenPlayerIds = useRef(null);
+  const freshIds = useRef(new Set());
+  const presentIds = [...poolPlayers, ...notPresentPlayers].map(p => p.id);
+  if (seenPlayerIds.current === null) {
+    seenPlayerIds.current = new Set(presentIds);
+  } else {
+    const added = presentIds.filter(id => !seenPlayerIds.current.has(id));
+    if (added.length > 0) {
+      added.forEach(id => freshIds.current.add(id));
+      seenPlayerIds.current = new Set(presentIds);
+    } else if (presentIds.length !== seenPlayerIds.current.size) {
+      seenPlayerIds.current = new Set(presentIds);
+    }
+  }
+
+  useEffect(() => {
+    if (freshIds.current.size === 0) return undefined;
+    const t = setTimeout(() => freshIds.current.clear(), 500);
+    return () => clearTimeout(t);
+  }, [poolPlayers, notPresentPlayers]);
+
+  // Remaining cards glide when the list reorders (tier 3)
+  const inQueueSectionRef = useRef(null);
+  const onCourtSectionRef = useRef(null);
+
+  // Expanding a section scrolls it into view, so its contents aren't left
+  // below the fold. Waits a frame for the section to actually open first.
+  const revealSection = (ref) => {
+    requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  };
+
+  const availableGridRef = useRef(null);
+  useFlipList(availableGridRef);
+
   const playersOnCourt = filteredPoolPlayers
     .filter(p => isPlayerOnCourt(p.id))
     .sort((a, b) => a.joinedAt - b.joinedAt);
+
 
   // Auto-expand/collapse based on search
   useEffect(() => {
@@ -111,18 +187,11 @@ const PlayerPool = ({
     };
   }, [setPoolSearch]);
 
-  // Handle Clear Timers with confirmation
-  const handleClearTimers = async () => {
-    if (await showConfirm('Are you sure you want to clear all player idle times? This will reset everyone\'s wait time to now.')) {
-      clearIdleTimes();
-    }
-  };
-
   // Drag handlers for available players
   const handleDragStart = (e, player, section) => {
     e.dataTransfer.setData('application/json', JSON.stringify({
       player,
-      sourceType: section // 'pool' or 'notPresent'
+      sourceType: section // 'pool' | 'notPresent' | 'notInPool' | 'match'
     }));
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -130,10 +199,18 @@ const PlayerPool = ({
   const handleDragOver = (e, section) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragOverSection(section);
+    // Only update when it actually changes, so dragging across a section's
+    // cards doesn't set state on every dragover event.
+    setDragOverSection(prev => (prev === section ? prev : section));
   };
 
-  const handleDragLeave = () => {
+  // dragleave also fires when the cursor moves from a section onto one of the
+  // cards inside it, which cleared the highlight a moment before dragover set it
+  // again — that back-and-forth is the flicker. Ignore the event unless the
+  // cursor has genuinely left the section.
+  const handleDragLeave = (e) => {
+    const leavingTo = e.relatedTarget;
+    if (leavingTo && e.currentTarget.contains(leavingTo)) return;
     setDragOverSection(null);
   };
 
@@ -146,6 +223,9 @@ const PlayerPool = ({
         onDropPlayerToPool(data.sourceMatchId, data.player.id);
       } else if (data.sourceType === 'notPresent' && data.player) {
         moveToAvailable(data.player.id);
+      } else if (data.sourceType === 'notInPool' && data.player) {
+        onAddToAvailable?.(data.player);
+        setPoolSearch('');
       }
     } catch (err) {
       console.error('Drop error:', err);
@@ -161,6 +241,9 @@ const PlayerPool = ({
         moveToNotPresent(data.player.id);
       } else if (data.sourceType === 'match' && data.sourceMatchId && data.player) {
         onDropPlayerToNotPresent(data.sourceMatchId, data.player.id);
+      } else if (data.sourceType === 'notInPool' && data.player) {
+        onAddToPool?.(data.player);
+        setPoolSearch('');
       }
     } catch (err) {
       console.error('Drop error:', err);
@@ -168,27 +251,66 @@ const PlayerPool = ({
   };
 
   // Player card component for Available/In Match sections
-  // Get pulsing glow class based on wait time (only for players waiting 5+ minutes)
-  const getWaitGlowClass = (joinedAt) => {
-    if (!joinedAt) return '';
+  // Wait-time band for a player: drives a static border colour on their card
+  // (green from 5 min, yellow from 10, red from 15). Neon mode turns the same
+  // band into a fading gradient border.
+  const getWaitState = (joinedAt) => {
+    if (!joinedAt) return null;
     const diff = Math.floor((Date.now() - joinedAt) / 1000 / 60);
-    if (diff < 5) return '';
-    if (diff < 10) return 'animate-pulse-glow-green';
-    if (diff < 15) return 'animate-pulse-glow-yellow';
-    return 'animate-pulse-glow-red';
+    if (diff < 5) return null;
+    if (diff < 10) return 'green';
+    if (diff < 15) return 'yellow';
+    return 'red';
   };
 
-  const PlayerCard = ({ player, inMatch }) => {
-    const glowClass = !inMatch ? getWaitGlowClass(player.joinedAt) : '';
-    
+  const WAIT_BORDER_DARK = {
+    green: 'border-emerald-500/70',
+    yellow: 'border-yellow-500/70',
+    red: 'border-red-500/70'
+  };
+  const WAIT_BORDER_LIGHT = {
+    green: 'border-emerald-500',
+    yellow: 'border-yellow-500',
+    red: 'border-red-500'
+  };
+
+  const renderPlayerCard = (player, inMatch, section) => {
+    const wait = !inMatch ? getWaitState(player.joinedAt) : null;
+    const waitHook = wait ? `wait-border wait-border-${wait}` : '';
+
+    // Players in a match or on court can't be acted on, so their cards are
+    // washed out. The hook classes also let Neon tint the border per section.
+    const playHook = inMatch
+      ? `card-in-play ${section === 'court' ? 'card-in-court' : 'card-in-queue'}`
+      : (player.id === highlightPlayerId ? 'card-search-found' : '');
+
+    const inPlayBorderDark = section === 'court'
+      ? 'border-emerald-500/40'
+      : 'border-yellow-500/40';
+    const inPlayBorderLight = section === 'court'
+      ? 'border-emerald-500'
+      : 'border-yellow-500';
+
+    const borderDark = wait
+      ? WAIT_BORDER_DARK[wait]
+      : (inMatch ? inPlayBorderDark : 'border-slate-700/50 hover:border-cyan-500/50');
+    const borderLight = wait
+      ? WAIT_BORDER_LIGHT[wait]
+      : (inMatch ? inPlayBorderLight : 'border-slate-300 hover:border-cyan-600 hover:shadow-md');
+
     return (
     <div
+      key={player.id}
       draggable={!inMatch}
       onDragStart={(e) => !inMatch && handleDragStart(e, player, 'pool')}
-      className={`pool-card group rounded-lg p-2 border transition-all ${glowClass} ${
-        isDarkMode 
-          ? `bg-slate-800/50 ${inMatch ? 'border-yellow-500/30 opacity-70' : 'border-slate-700/50 hover:border-cyan-500/50'}` 
-          : `bg-white shadow-sm ${inMatch ? 'border-yellow-500 opacity-70' : 'border-slate-300 hover:border-cyan-600 hover:shadow-md'}`
+      data-player-card={player.id}
+      data-flip-key={`p-${player.id}`}
+      className={`pool-card group rounded-lg p-2 border transition-all ${waitHook} ${playHook} ${
+        freshIds.current.has(player.id) ? 'animate-card-settle ' : ''
+      }${
+        isDarkMode
+          ? `bg-slate-800/50 ${borderDark}`
+          : `bg-white shadow-sm ${borderLight}`
       } ${!inMatch ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
       <div className="flex items-center justify-between mb-1.5">
@@ -211,9 +333,9 @@ const PlayerPool = ({
           </button>
         )}
       </div>
-      <div className="flex items-center justify-between gap-1">
+      <div className="flex items-center justify-between gap-1 flex-nowrap">
         <LevelBadge level={player.level} isDarkMode={isDarkMode} />
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs flex-shrink-0 whitespace-nowrap">
           <span className={`inline-flex items-center gap-0.5 leading-none tabular ${isDarkMode ? getWaitTimeColor(player.joinedAt) : getWaitTimeColorLight(player.joinedAt)}`} title="Wait time">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -241,36 +363,45 @@ const PlayerPool = ({
   )};
 
   // Not Present player card - simpler, single line
-  const NotPresentCard = ({ player }) => (
+  const renderNotPresentCard = (player) => (
     <div
+      key={player.id}
       draggable={true}
+      data-player-card={player.id}
       onDragStart={(e) => handleDragStart(e, player, 'notPresent')}
-      className={`pool-card group rounded-lg px-2 py-1.5 border transition-all cursor-grab active:cursor-grabbing ${
+      className={`pool-card card-not-present group rounded-lg px-2 py-1.5 border transition-all cursor-grab active:cursor-grabbing ${
+        freshIds.current.has(player.id) ? 'animate-card-settle ' : ''
+      }${
+        player.id === highlightPlayerId ? 'card-search-found ' : ''
+      }${
         isDarkMode 
-          ? 'bg-slate-800/30 border-red-500/30 hover:border-red-500/50' 
-          : 'bg-red-50/30 border-red-300/50 hover:border-red-400 shadow-sm'
+          ? 'bg-slate-800/30 border-slate-600/50 hover:border-slate-500' 
+          : 'bg-white border-slate-300 hover:border-slate-400 shadow-sm'
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={`font-normal text-sm truncate flex-1 ${
-          isDarkMode ? 'text-slate-200' : 'text-slate-700'
+        <span className={`font-light text-sm truncate flex-1 ${
+          isDarkMode ? 'text-slate-300' : 'text-slate-800'
         }`}>{player.name}</span>
         <button
           onClick={() => moveToAvailable(player.id)}
-          className={`text-xs px-2 py-0.5 rounded transition-colors flex-shrink-0 ${
-            isDarkMode 
-              ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400' 
-              : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-300'
+          title={`Check ${player.name} in to Available`}
+          className={`neon-check-btn flex-shrink-0 w-6 h-6 rounded flex items-center justify-center transition-colors ${
+            isDarkMode
+              ? 'bg-emerald-500/30 hover:bg-emerald-500/45 text-emerald-200'
+              : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-400'
           }`}
         >
-          ✓-In
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
         </button>
         <button
           onClick={() => removeFromPool(player.id)}
-          className={`p-0.5 rounded transition-all flex-shrink-0 ${
-            isDarkMode 
-              ? 'text-red-400 hover:text-red-300 hover:bg-red-500/20' 
-              : 'text-red-500 hover:text-red-600 hover:bg-red-100'
+          className={`neon-remove-btn flex-shrink-0 w-6 h-6 rounded flex items-center justify-center transition-colors ${
+            isDarkMode
+              ? 'bg-red-500/30 hover:bg-red-500/45 text-red-200'
+              : 'bg-red-100 hover:bg-red-200 text-red-700 border border-red-400'
           }`}
           title="Remove from pool"
         >
@@ -311,7 +442,7 @@ const PlayerPool = ({
       }`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+            <div className={`panel-icon w-8 h-8 rounded-lg flex items-center justify-center ${
               isDarkMode ? 'bg-cyan-500/20' : 'bg-cyan-100'
             }`}>
               <svg className={`w-5 h-5 ${isDarkMode ? 'text-cyan-500' : 'text-cyan-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -323,22 +454,6 @@ const PlayerPool = ({
               <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{totalPlayers} players total</p>
             </div>
           </div>
-          {/* Clear Timers Button */}
-          <button
-            onClick={handleClearTimers}
-            disabled={poolPlayers.length === 0}
-            className={`px-2 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
-              isDarkMode 
-                ? 'bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 text-slate-300 hover:text-white disabled:text-slate-500' 
-                : 'bg-white hover:bg-slate-100 disabled:bg-slate-50 text-slate-700 hover:text-slate-900 disabled:text-slate-400 border border-slate-300'
-            } disabled:cursor-not-allowed`}
-            title="Reset all idle times to now"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Clear Timers
-          </button>
         </div>
         
         {/* Search and Filter */}
@@ -378,7 +493,8 @@ const PlayerPool = ({
             )}
           </div>
           <ThemedSelect
-            className="w-32 flex-none"
+            className="w-28 flex-none"
+            compact
             value={poolLevelFilter}
             onChange={(e) => setPoolLevelFilter(e.target.value)}
             isDarkMode={isDarkMode}
@@ -392,15 +508,7 @@ const PlayerPool = ({
       </div>
       
       <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
-        {totalPlayers === 0 ? (
-          <div className={`text-center py-8 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-            <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <p>No players in pool</p>
-            <p className="text-sm mt-1">Add players from the database</p>
-          </div>
-        ) : (
+        {(
           <div className="space-y-4">
             {/* Available Players Section */}
             <div
@@ -413,14 +521,25 @@ const PlayerPool = ({
                   : ''
               }`}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <div className="head-available flex items-center gap-2 mb-2">
+                <div className="head-dot w-2 h-2 bg-blue-500 rounded-full"></div>
                 <h3 className={`text-sm font-semibold uppercase tracking-wider ${
                   isDarkMode ? 'text-blue-400' : 'text-blue-600'
                 }`}>
                   Available
                 </h3>
-                <span className={`count-pill text-[11px] px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-cyan-500/15 text-cyan-300' : 'bg-cyan-100 text-cyan-700'}`}>{availablePlayers.length}</span>
+                <span className={`count-pill text-[9px] leading-none px-1.5 py-[3px] rounded-full ${isDarkMode ? 'bg-cyan-500/15 text-cyan-300' : 'bg-cyan-100 text-cyan-700'}`}>{availablePlayers.length}</span>
+                <AddPlayerMenu
+                  isDarkMode={isDarkMode}
+                  players={pickerPlayers}
+                  getStatus={playerSectionStatus}
+                  onSelect={(player) => onAddToAvailable?.(player)}
+                  onCreatePlayer={onCreatePlayer}
+                  levels={SKILL_LEVELS}
+                  title="Add a player to Available"
+                  className="ml-auto"
+                  accent="blue"
+                />
               </div>
               {availablePlayers.length === 0 ? (
                 <div className={`text-center py-4 text-sm rounded-lg ${
@@ -429,9 +548,9 @@ const PlayerPool = ({
                   No available players
                 </div>
               ) : (
-                <div className={`grid ${gridCols} gap-2`}>
+                <div ref={availableGridRef} className={`grid ${gridCols} gap-2`}>
                   {availablePlayers.map(player => (
-                    <PlayerCard key={player.id} player={player} inMatch={false} />
+                    renderPlayerCard(player, false)
                   ))}
                 </div>
               )}
@@ -448,16 +567,27 @@ const PlayerPool = ({
                   : ''
               }`}
             >
-              <div className={`flex items-center gap-2 mb-2 pt-2 border-t ${
+              <div className={`head-notpresent flex items-center gap-2 mb-2 pt-2 border-t ${
                 isDarkMode ? 'border-slate-700/50' : 'border-slate-200'
               }`}>
-                <div className={`w-2 h-2 rounded-full ${isDarkMode ? 'bg-red-500' : 'bg-red-400'}`}></div>
-                <h3 className={`text-sm font-semibold uppercase tracking-wider ${
-                  isDarkMode ? 'text-red-400' : 'text-red-500'
+                <div className={`head-dot w-2 h-2 rounded-full ${isDarkMode ? 'bg-slate-500' : 'bg-slate-400'}`}></div>
+                <h3 className={`head-notpresent-title text-sm font-semibold uppercase tracking-wider ${
+                  isDarkMode ? 'text-slate-400' : 'text-slate-500'
                 }`}>
                   Not Present
                 </h3>
-                <span className={`count-pill text-[11px] px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-red-500/15 text-red-300' : 'bg-red-100 text-red-600'}`}>{filteredNotPresent.length}</span>
+                <span className={`count-pill text-[9px] leading-none px-1.5 py-[3px] rounded-full ${isDarkMode ? 'bg-slate-500/15 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>{filteredNotPresent.length}</span>
+                <AddPlayerMenu
+                  isDarkMode={isDarkMode}
+                  players={pickerPlayers}
+                  getStatus={playerSectionStatus}
+                  onSelect={(player) => onAddToPool?.(player)}
+                  onCreatePlayer={onCreatePlayer}
+                  levels={SKILL_LEVELS}
+                  title="Add a player to Not Present"
+                  className="ml-auto"
+                  accent="slate"
+                />
               </div>
               {filteredNotPresent.length === 0 ? (
                 <div className={`text-center py-4 text-sm rounded-lg ${
@@ -476,7 +606,7 @@ const PlayerPool = ({
                       </div>
                       <div className={`grid ${gridCols} gap-1`}>
                         {groupedNotPresent[letter].map(player => (
-                          <NotPresentCard key={player.id} player={player} />
+                          renderNotPresentCard(player)
                         ))}
                       </div>
                     </div>
@@ -487,9 +617,13 @@ const PlayerPool = ({
 
             {/* Players In Match Queue Section - Collapsible */}
             {playersInQueue.length > 0 && (
-              <div>
+              <div ref={inQueueSectionRef}>
                 <button
-                  onClick={() => setInQueueCollapsed(!inQueueCollapsed)}
+                  onClick={() => {
+                    const opening = inQueueCollapsed;
+                    setInQueueCollapsed(!inQueueCollapsed);
+                    if (opening) revealSection(inQueueSectionRef);
+                  }}
                   className={`w-full flex items-center justify-between gap-2 mb-2 pt-2 border-t ${
                     isDarkMode ? 'border-slate-700/50' : 'border-slate-200'
                   }`}
@@ -501,7 +635,7 @@ const PlayerPool = ({
                     }`}>
                       In Match Queue
                     </h3>
-                    <span className={`count-pill text-[11px] px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-yellow-500/15 text-yellow-300' : 'bg-yellow-100 text-yellow-700'}`}>{playersInQueue.length}</span>
+                    <span className={`count-pill text-[9px] leading-none px-1.5 py-[3px] rounded-full ${isDarkMode ? 'bg-yellow-500/15 text-yellow-300' : 'bg-yellow-100 text-yellow-700'}`}>{playersInQueue.length}</span>
                   </div>
                   <svg 
                     className={`w-4 h-4 transition-transform ${inQueueCollapsed ? '' : 'rotate-180'} ${
@@ -517,7 +651,7 @@ const PlayerPool = ({
                 {!inQueueCollapsed && (
                   <div className={`grid ${gridCols} gap-2`}>
                     {playersInQueue.map(player => (
-                      <PlayerCard key={player.id} player={player} inMatch={true} />
+                      renderPlayerCard(player, true, 'queue')
                     ))}
                   </div>
                 )}
@@ -526,9 +660,13 @@ const PlayerPool = ({
 
             {/* Players On Court Section - Collapsible */}
             {playersOnCourt.length > 0 && (
-              <div>
+              <div ref={onCourtSectionRef}>
                 <button
-                  onClick={() => setOnCourtCollapsed(!onCourtCollapsed)}
+                  onClick={() => {
+                    const opening = onCourtCollapsed;
+                    setOnCourtCollapsed(!onCourtCollapsed);
+                    if (opening) revealSection(onCourtSectionRef);
+                  }}
                   className={`w-full flex items-center justify-between gap-2 mb-2 pt-2 border-t ${
                     isDarkMode ? 'border-slate-700/50' : 'border-slate-200'
                   }`}
@@ -540,7 +678,7 @@ const PlayerPool = ({
                     }`}>
                       In Court
                     </h3>
-                    <span className={`count-pill text-[11px] px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>{playersOnCourt.length}</span>
+                    <span className={`count-pill text-[9px] leading-none px-1.5 py-[3px] rounded-full ${isDarkMode ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>{playersOnCourt.length}</span>
                   </div>
                   <svg 
                     className={`w-4 h-4 transition-transform ${onCourtCollapsed ? '' : 'rotate-180'} ${
@@ -556,12 +694,79 @@ const PlayerPool = ({
                 {!onCourtCollapsed && (
                   <div className={`grid ${gridCols} gap-2`}>
                     {playersOnCourt.map(player => (
-                      <PlayerCard key={player.id} player={player} inMatch={true} />
+                      renderPlayerCard(player, true, 'court')
                     ))}
                   </div>
                 )}
               </div>
             )}
+
+          </div>
+        )}
+
+        {/* Not In Pool - database players matching the search that aren't
+            in the pool yet, with a shortcut to add them. */}
+        {notInPoolMatches.length > 0 && (
+          <div className={`mt-4 pt-3 border-t ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`head-notinpool-dot w-2 h-2 rounded-full ${isDarkMode ? 'bg-red-500' : 'bg-red-400'}`}></div>
+              <h3 className={`head-notinpool-title text-sm font-semibold uppercase tracking-wider ${
+                isDarkMode ? 'text-red-400' : 'text-red-500'
+              }`}>
+                Not In Pool
+              </h3>
+              <span className={`count-pill text-[9px] leading-none px-1.5 py-[3px] rounded-full ${
+                isDarkMode ? 'bg-red-500/15 text-red-300' : 'bg-red-100 text-red-600'
+              }`}>{notInPoolMatches.length}</span>
+            </div>
+            <div className={`grid ${gridCols} gap-2`}>
+              {notInPoolMatches.map(player => (
+                <div
+                  key={player.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, player, 'notInPool')}
+                  className={`pool-card group rounded-lg px-2 py-1.5 border flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing ${
+                    isDarkMode
+                      ? 'bg-slate-800/40 border-slate-700/50 hover:border-slate-500'
+                      : 'bg-white border-slate-300 hover:border-slate-400 shadow-sm'
+                  }`}
+                >
+                  <span className={`font-normal text-sm truncate ${
+                    player.gender === 'male'
+                      ? (isDarkMode ? 'text-blue-300' : 'text-blue-700')
+                      : (isDarkMode ? 'text-pink-300' : 'text-pink-700')
+                  }`}>{player.name}</span>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => { onAddToAvailable?.(player); setPoolSearch(''); }}
+                    title={`Check ${player.name} in to Available`}
+                    className={`neon-check-btn-blue flex-shrink-0 w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                      isDarkMode
+                        ? 'bg-blue-500/25 hover:bg-blue-500/40 text-blue-200'
+                        : 'bg-blue-100 hover:bg-blue-200 text-blue-800 border border-blue-400'
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => { onAddToPool?.(player); setPoolSearch(''); }}
+                    title={`Add ${player.name} to Not Present`}
+                    className={`neon-add-btn-slate flex-shrink-0 w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                      isDarkMode
+                        ? 'bg-slate-600/40 hover:bg-slate-600/60 text-slate-200'
+                        : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-400'
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

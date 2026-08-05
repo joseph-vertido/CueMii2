@@ -29,6 +29,7 @@ const ThemedSelect = ({
   onChange,
   children,
   disabled = false,
+  compact = false,
   ...rest
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -52,11 +53,11 @@ const ThemedSelect = ({
     const openUp = spaceBelow < 200 && r.top > spaceBelow;
     setCoords({
       left: r.left,
-      width: Math.max(r.width, 150),
+      width: Math.max(r.width, compact ? 132 : 150),
       top: openUp ? undefined : r.bottom + 4,
       bottom: openUp ? window.innerHeight - r.top + 4 : undefined,
     });
-  }, []);
+  }, [compact]);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -132,7 +133,9 @@ const ThemedSelect = ({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`w-full min-w-0 flex items-center justify-between gap-2 rounded-lg border pl-2.5 pr-2 py-1 text-sm text-left transition-colors focus:outline-none focus:ring-1 focus:ring-cyan-500 ${
+        className={`w-full min-w-0 flex items-center justify-between gap-2 rounded-lg border text-left transition-colors focus:outline-none focus:ring-1 focus:ring-cyan-500 ${
+          compact ? 'pl-2.5 pr-2 py-1 text-[0.8rem]' : 'pl-2.5 pr-2 py-1 text-sm'
+        } ${
           disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
         } ${
           isDarkMode
@@ -142,7 +145,7 @@ const ThemedSelect = ({
       >
         <span className="truncate">{selected ? selected.label : ''}</span>
         <svg
-          className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${
+          className={`${compact ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5'} flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${
             isDarkMode ? 'text-slate-400' : 'text-slate-500'
           }`}
           fill="none"
@@ -165,11 +168,11 @@ const ThemedSelect = ({
             width: coords.width,
             zIndex: 60,
           }}
-          className={`rounded-lg shadow-xl border overflow-hidden ${
+          className={`${coords.bottom !== undefined ? 'animate-panel-open-up' : 'animate-panel-open'} rounded-lg shadow-xl border overflow-hidden ${
             isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
           }`}
         >
-          <div className="max-h-60 overflow-y-auto custom-scrollbar py-1">
+          <div className={`${compact ? 'max-h-56' : 'max-h-60'} overflow-y-auto custom-scrollbar py-1`}>
             {options.map((option, i) => {
               const isSelected = String(option.value) === String(value);
               const isActive = i === activeIndex;
@@ -181,7 +184,9 @@ const ThemedSelect = ({
                   aria-selected={isSelected}
                   onMouseEnter={() => setActiveIndex(i)}
                   onClick={() => pick(option.value)}
-                  className={`w-full text-left px-3 py-1.5 text-sm flex items-center justify-between gap-2 transition-colors ${
+                  className={`w-full text-left flex items-center justify-between gap-2 transition-colors ${
+                    compact ? 'px-3 py-1.5 text-[0.8rem]' : 'px-3 py-1.5 text-sm'
+                  } ${
                     isDarkMode
                       ? `${isActive ? 'bg-slate-700' : ''} ${isSelected ? 'text-cyan-300' : 'text-slate-200'}`
                       : `${isActive ? 'bg-slate-100' : ''} ${isSelected ? 'text-cyan-700' : 'text-slate-700'}`

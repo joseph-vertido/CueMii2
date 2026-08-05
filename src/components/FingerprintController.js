@@ -202,12 +202,18 @@ const FingerprintController = ({
 
       {toast && (
         toast.tone === 'error' ? (
-          <div key={toast.id} className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm font-medium shadow-xl bg-red-600 text-white">
+          <div key={toast.id} className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 rounded-lg text-sm font-medium shadow-xl bg-red-600 text-white">
             {toast.text}
           </div>
         ) : (
-          <div key={toast.id} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 pl-3 pr-6 py-3 rounded-2xl shadow-2xl border text-white animate-fade-in-out border-emerald-500/40 bg-gradient-to-r from-emerald-800 to-green-800">
-            <span className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 ring-1 ring-white/30">
+          <div key={toast.id} className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-3 pl-3 pr-6 py-3 rounded-2xl shadow-2xl border animate-fade-in-out ${
+            isDarkMode
+              ? 'border-emerald-500/40 bg-gradient-to-r from-emerald-800 to-green-800 text-white'
+              : 'border-emerald-300 bg-gradient-to-r from-emerald-50 to-green-100 text-emerald-900'
+          }`}>
+            <span className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ring-1 ${
+              isDarkMode ? 'bg-white/20 ring-white/30' : 'bg-emerald-500/15 ring-emerald-400/50 text-emerald-700'
+            }`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                 <path d="M18.9 7a8 8 0 0 1 1.1 5v1a6 6 0 0 0 .8 3" />
                 <path d="M8 11a4 4 0 0 1 8 0v1a10 10 0 0 0 2 6" />
@@ -217,8 +223,8 @@ const FingerprintController = ({
               </svg>
             </span>
             <div className="leading-tight">
-              <div className="text-[11px] uppercase tracking-wider text-emerald-50/90">Welcome back</div>
-              <div className="text-xl font-bold text-white">{toast.text}</div>
+              <div className={`text-[11px] uppercase tracking-wider ${isDarkMode ? 'text-emerald-50/90' : 'text-emerald-700'}`}>Welcome back</div>
+              <div className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-emerald-900'}`}>{toast.text}</div>
             </div>
           </div>
         )

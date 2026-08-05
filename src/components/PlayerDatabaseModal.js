@@ -282,8 +282,8 @@ const PlayerDatabaseModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`neon-panel rounded-2xl w-[92vw] max-w-[1000px] h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-300'}`}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={handleClose}>
+      <div onClick={(e) => e.stopPropagation()} className={`neon-panel rounded-2xl w-[92vw] max-w-[1000px] h-[calc(100vh-2rem)] flex flex-col overflow-hidden shadow-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-slate-300'}`}>
         {/* Header */}
         <div className={`px-4 py-2.5 flex justify-between items-center flex-shrink-0 border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
           <div className="flex items-center gap-3">
@@ -380,7 +380,7 @@ const PlayerDatabaseModal = ({
           </div>
         )}
         
-        <div className="p-6 flex-1 overflow-y-auto flex flex-col min-h-0">
+        <div className="p-6 flex-1 overflow-y-auto custom-scrollbar player-db-scroll flex flex-col min-h-0">
           {/* Import/Export Status Messages */}
           {(importError || importSuccess) && (
             <div className="mb-4 flex gap-3">
@@ -534,19 +534,19 @@ const PlayerDatabaseModal = ({
           </div>
 
           {/* Player List */}
-          <div ref={playerListRef} className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
+          <div ref={playerListRef} className="flex-1 overflow-y-auto custom-scrollbar player-db-scroll min-h-0">
             <table className="w-full table-fixed">
               <colgroup>
-                <col className="w-[30%]" />
-                <col className="w-[12%]" />
-                <col className="w-[12%]" />
+                <col className="w-[26%]" />
+                <col className="w-[14%]" />
+                <col className="w-[14%]" />
                 <col className="w-[17%]" />
                 <col className="w-[13%]" />
                 <col className="w-[16%]" />
               </colgroup>
-              <thead className={`sticky top-0 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+              <thead className="sticky top-0 z-20">
                 <tr className={`text-left text-[0.95rem] ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                  <th className="py-3 px-2 align-middle">
+                  <th className={`py-2 px-2 align-middle ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                     <button 
                       onClick={() => handleSort('name')}
                       className="flex items-center gap-1.5 font-semibold hover:text-cyan-400 transition-colors"
@@ -555,7 +555,7 @@ const PlayerDatabaseModal = ({
                       Name <SortIcon field="name" />
                     </button>
                   </th>
-                  <th className="py-3 px-2 align-middle">
+                  <th className={`py-2 px-2 align-middle ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                     <button 
                       onClick={() => handleSort('gender')}
                       className="flex items-center gap-1.5 font-semibold hover:text-cyan-400 transition-colors"
@@ -564,7 +564,7 @@ const PlayerDatabaseModal = ({
                       Gender <SortIcon field="gender" />
                     </button>
                   </th>
-                  <th className="py-3 px-2 align-middle">
+                  <th className={`py-2 px-2 align-middle ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                     <button 
                       onClick={() => handleSort('level')}
                       className="flex items-center gap-1.5 font-semibold hover:text-cyan-400 transition-colors"
@@ -573,7 +573,7 @@ const PlayerDatabaseModal = ({
                       Level <SortIcon field="level" />
                     </button>
                   </th>
-                  <th className="py-3 px-2 align-middle">
+                  <th className={`py-2 px-2 align-middle ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                     <button 
                       onClick={() => handleSort('fingerprint')}
                       className="flex items-center gap-1.5 font-semibold hover:text-cyan-400 transition-colors"
@@ -582,7 +582,7 @@ const PlayerDatabaseModal = ({
                       Fingerprint <SortIcon field="fingerprint" />
                     </button>
                   </th>
-                  <th className="py-3 px-2 align-middle">
+                  <th className={`py-2 px-2 align-middle ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                     <button 
                       onClick={() => handleSort('status')}
                       className="flex items-center gap-1.5 font-semibold hover:text-cyan-400 transition-colors"
@@ -591,7 +591,7 @@ const PlayerDatabaseModal = ({
                       Status <SortIcon field="status" />
                     </button>
                   </th>
-                  <th className="py-3 px-2 align-middle">
+                  <th className={`py-2 px-2 align-middle ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                     <span className="flex items-center justify-end gap-1.5 font-semibold">
                       <svg className="w-4 h-4 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /></svg>
                       Actions
@@ -613,16 +613,17 @@ const PlayerDatabaseModal = ({
                   >
                     {editingPlayer?.id === player.id ? (
                       <>
-                        <td className="py-3 px-2">
+                        <td className="h-[46px] align-middle py-1 pl-4 pr-2">
                           <input
                             type="text"
                             value={editingPlayer.name}
                             onChange={(e) => setEditingPlayer({ ...editingPlayer, name: e.target.value })}
-                            className={`w-full min-w-0 max-w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-600 text-slate-100' : 'bg-white border-slate-300 text-slate-800'}`}
+                            className={`w-full min-w-0 max-w-full h-7 rounded-lg border px-2.5 py-0 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-600 text-slate-100' : 'bg-white border-slate-300 text-slate-800'}`}
                           />
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="h-[46px] align-middle py-1 pl-4 pr-2">
                           <ThemedSelect
+                            compact
                               value={editingPlayer.gender}
                               onChange={(e) => setEditingPlayer({ ...editingPlayer, gender: e.target.value })}
                               isDarkMode={isDarkMode}
@@ -631,8 +632,9 @@ const PlayerDatabaseModal = ({
                               <option value="female">Female</option>
                             </ThemedSelect>
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="h-[46px] align-middle py-1 pl-4 pr-2">
                           <ThemedSelect
+                            compact
                               value={editingPlayer.level}
                               onChange={(e) => setEditingPlayer({ ...editingPlayer, level: e.target.value })}
                               isDarkMode={isDarkMode}
@@ -642,22 +644,27 @@ const PlayerDatabaseModal = ({
                               ))}
                             </ThemedSelect>
                         </td>
-                        <td className="py-3 px-2">
-                          <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${hasFingerprint(player.id) ? (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-800 border border-green-400') : (isDarkMode ? 'bg-slate-600/40 text-slate-500' : 'bg-slate-200 text-slate-700 border border-slate-400')}`}>
-                            {hasFingerprint(player.id) ? 'Stored' : 'None'}
+                        <td className="h-[46px] align-middle py-1 pl-8 pr-2">
+                          <span
+                            className={'inline-flex items-center align-middle ' + (hasFingerprint(player.id)
+                              ? (isDarkMode ? 'text-green-400' : 'text-green-600')
+                              : (isDarkMode ? 'text-slate-600' : 'text-slate-300'))}
+                            title={hasFingerprint(player.id) ? 'Fingerprint enrolled' : 'No fingerprint enrolled'}
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M18.9 7a8 8 0 0 1 1.1 5v1a6 6 0 0 0 .8 3" /><path d="M8 11a4 4 0 0 1 8 0v1a10 10 0 0 0 2 6" /><path d="M12 11v2a14 14 0 0 0 2.5 8" /><path d="M8 15a18 18 0 0 0 1.8 6" /><path d="M4.9 19a22 22 0 0 1 -.9 -7v-1a8 8 0 0 1 12 -6.95" /></svg>
                           </span>
                         </td>
-                        <td className="py-3 px-2">
-                          <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${isInPool(player.id) ? (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-800 border border-green-400') : (isDarkMode ? 'bg-slate-600/50 text-slate-400' : 'bg-slate-200 text-slate-700 border border-slate-400')}`}>
+                        <td className="h-[46px] align-middle py-1 pl-4 pr-2">
+                          <span className={`db-pill text-xs px-2 py-1 rounded-full whitespace-nowrap ${isInPool(player.id) ? (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-800 border border-green-400') : (isDarkMode ? 'bg-slate-600/50 text-slate-400' : 'bg-slate-200 text-slate-700 border border-slate-400')}`}>
                             {isInPool(player.id) ? 'In Pool' : 'Not In Pool'}
                           </span>
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="h-[46px] align-middle py-1 pl-4 pr-2">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={handleSaveEdit}
                               title="Save changes"
-                              className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-green-500/20 hover:bg-green-500/35 text-green-300' : 'bg-green-100 hover:bg-green-200 text-green-800 border border-green-400'}`}
+                              className={`db-action-btn w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-green-500/20 hover:bg-green-500/35 text-green-300' : 'bg-green-100 hover:bg-green-200 text-green-800 border border-green-400'}`}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -666,7 +673,7 @@ const PlayerDatabaseModal = ({
                             <button
                               onClick={() => setEditingPlayer(null)}
                               title="Cancel"
-                              className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-slate-600/40 hover:bg-slate-600/60 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-400'}`}
+                              className={`db-action-btn w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-slate-600/40 hover:bg-slate-600/60 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 border border-slate-400'}`}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -677,22 +684,22 @@ const PlayerDatabaseModal = ({
                       </>
                     ) : (
                       <>
-                        <td className="py-3 px-2 truncate">
+                        <td className="h-[46px] align-middle py-1 pl-4 pr-2 truncate">
                           <span className={`font-normal text-[0.9rem] ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{player.name}</span>
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="h-[46px] align-middle py-1 pl-4 pr-2">
                           <span className={`capitalize text-[0.9rem] ${player.gender === 'male' ? (isDarkMode ? 'text-blue-300' : 'text-blue-700') : (isDarkMode ? 'text-pink-300' : 'text-pink-700')}`}>
                             {player.gender === 'male' ? '♂' : '♀'} {player.gender}
                           </span>
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="h-[46px] align-middle py-1 pl-4 pr-2">
                           <LevelBadge level={player.level} isDarkMode={isDarkMode} />
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="h-[46px] align-middle py-1 pl-8 pr-2">
                           {hasFingerprint(player.id) ? (
-                            <span className="inline-flex items-center gap-1">
-                              <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-800 border border-green-400'}`} title="Fingerprint enrolled">
-                                Stored
+                            <span className="inline-flex items-center gap-1.5 align-middle">
+                              <span className={`inline-flex items-center align-middle ${isDarkMode ? 'text-green-400' : 'text-green-600'}`} title="Fingerprint enrolled">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M18.9 7a8 8 0 0 1 1.1 5v1a6 6 0 0 0 .8 3" /><path d="M8 11a4 4 0 0 1 8 0v1a10 10 0 0 0 2 6" /><path d="M12 11v2a14 14 0 0 0 2.5 8" /><path d="M8 15a18 18 0 0 0 1.8 6" /><path d="M4.9 19a22 22 0 0 1 -.9 -7v-1a8 8 0 0 1 12 -6.95" /></svg>
                               </span>
                               <button
                                 onClick={async () => {
@@ -707,17 +714,17 @@ const PlayerDatabaseModal = ({
                               </button>
                             </span>
                           ) : (
-                            <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${isDarkMode ? 'bg-slate-600/40 text-slate-500' : 'bg-slate-200 text-slate-700 border border-slate-400'}`} title="No fingerprint enrolled">
-                              None
+                            <span className={`inline-flex items-center align-middle ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} title="No fingerprint enrolled">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M18.9 7a8 8 0 0 1 1.1 5v1a6 6 0 0 0 .8 3" /><path d="M8 11a4 4 0 0 1 8 0v1a10 10 0 0 0 2 6" /><path d="M12 11v2a14 14 0 0 0 2.5 8" /><path d="M8 15a18 18 0 0 0 1.8 6" /><path d="M4.9 19a22 22 0 0 1 -.9 -7v-1a8 8 0 0 1 12 -6.95" /></svg>
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-2">
-                          <span className={`text-xs px-2 py-1 rounded-full ${isInPool(player.id) ? (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-800 border border-green-400') : (isDarkMode ? 'bg-slate-600/50 text-slate-400' : 'bg-slate-200 text-slate-700 border border-slate-400')}`}>
+                        <td className="h-[46px] align-middle py-1 pl-4 pr-2">
+                          <span className={`db-pill text-xs px-2 py-1 rounded-full whitespace-nowrap ${isInPool(player.id) ? (isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-800 border border-green-400') : (isDarkMode ? 'bg-slate-600/50 text-slate-400' : 'bg-slate-200 text-slate-700 border border-slate-400')}`}>
                             {isInPool(player.id) ? 'In Pool' : 'Not In Pool'}
                           </span>
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="h-[46px] align-middle py-1 pl-4 pr-2">
                           <div className="flex items-center justify-end gap-1.5">
                             {!isInPool(player.id) ? (
                               <button
@@ -729,7 +736,7 @@ const PlayerDatabaseModal = ({
                                   searchInputRef.current?.focus(); 
                                 }}
                                 title="Add to pool"
-                                className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300' : 'bg-cyan-100 hover:bg-cyan-200 text-cyan-800 border border-cyan-400'}`}
+                                className={`db-action-btn w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300' : 'bg-cyan-100 hover:bg-cyan-200 text-cyan-800 border border-cyan-400'}`}
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -739,7 +746,7 @@ const PlayerDatabaseModal = ({
                               <button
                                 onClick={() => { onRemoveFromPool(player.id); setSearchTerm(''); setLetterFilter(''); searchInputRef.current?.focus(); }}
                                 title="Remove from pool"
-                                className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-orange-500/25 hover:bg-orange-500/40 text-orange-300' : 'bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-400'}`}
+                                className={`db-action-btn w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-orange-500/25 hover:bg-orange-500/40 text-orange-300' : 'bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-400'}`}
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -749,7 +756,7 @@ const PlayerDatabaseModal = ({
                             <button
                               onClick={() => setEditingPlayer({ ...player })}
                               title="Edit player"
-                              className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-yellow-500/20 hover:bg-yellow-500/35 text-yellow-300' : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border border-yellow-400'}`}
+                              className={`db-action-btn w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-yellow-500/20 hover:bg-yellow-500/35 text-yellow-300' : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border border-yellow-400'}`}
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -765,7 +772,7 @@ const PlayerDatabaseModal = ({
                                 }
                               }}
                               title="Delete player"
-                              className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-red-500/20 hover:bg-red-500/35 text-red-300' : 'bg-red-100 hover:bg-red-200 text-red-700 border border-red-400'}`}
+                              className={`db-action-btn w-7 h-7 flex items-center justify-center rounded-md transition-colors flex-shrink-0 ${isDarkMode ? 'bg-red-500/20 hover:bg-red-500/35 text-red-300' : 'bg-red-100 hover:bg-red-200 text-red-700 border border-red-400'}`}
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

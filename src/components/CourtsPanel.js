@@ -1,10 +1,12 @@
 import React, { useMemo, useRef, useEffect } from 'react';
+import useFlipList from '../hooks/useFlipList';
 import { formatCourtTime } from '../utils/formatters';
 
 /**
  * Courts panel displaying all courts and their current status - Ultra compact
  */
 const CourtsPanel = ({
+  highlightPlayerId,
   courts,
   newCourtName,
   setNewCourtName,
@@ -28,18 +30,58 @@ const CourtsPanel = ({
 }) => {
   // Refs for each court element
   const courtRefs = useRef({});
+  // Courts are ordered by when their match was assigned, so assigning one
+  // genuinely reorders the panel - animate the cards to their new places.
+  const courtGridRef = useRef(null);
+
+  // Courts that have just appeared get an entrance animation.
+  //
+  // Freshness is worked out during the render itself, not in an effect. An
+  // effect runs *after* the first paint, so the court would appear at full size
+  // for one frame and only then jump to the start of its animation — that flash
+  // is the flicker.
+  const seenCourtIds = useRef(null);
+  const freshCourtIds = useRef(new Set());
+  const courtIds = courts.map(c => c.id);
+  if (seenCourtIds.current === null) {
+    seenCourtIds.current = new Set(courtIds);
+  } else {
+    const added = courtIds.filter(id => !seenCourtIds.current.has(id));
+    if (added.length > 0) {
+      added.forEach(id => freshCourtIds.current.add(id));
+      seenCourtIds.current = new Set(courtIds);
+    } else if (courtIds.length !== seenCourtIds.current.size) {
+      seenCourtIds.current = new Set(courtIds);
+    }
+  }
+
+  // Drop the marker once the animation has played, so it can't replay later.
+  useEffect(() => {
+    if (freshCourtIds.current.size === 0) return undefined;
+    const t = setTimeout(() => freshCourtIds.current.clear(), 600);
+    return () => clearTimeout(t);
+  }, [courts]);
+  // Hold the courts still while the players are walking on, then move them at a
+  // more readable pace than the default.
+  useFlipList(courtGridRef, { duration: 600, delay: 680 });
   
   // Determine grid columns based on panel width
   const useGrid = panelWidth >= 380;
   
-  // Scroll to court when scrollToCourtId changes
+  // A newly assigned court sorts to the end of the list, so follow it all the
+  // way to the bottom. Waits for the reorder to begin so the scroll travels with
+  // the card rather than arriving before it has moved.
   useEffect(() => {
-    if (scrollToCourtId && courtRefs.current[scrollToCourtId]) {
-      courtRefs.current[scrollToCourtId].scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center' 
-      });
-    }
+    if (!scrollToCourtId) return undefined;
+    const t = setTimeout(() => {
+      const container = courtGridRef.current;
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      } else if (courtRefs.current[scrollToCourtId]) {
+        courtRefs.current[scrollToCourtId].scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    }, 700);
+    return () => clearTimeout(t);
   }, [scrollToCourtId]);
   // Compute which players need alternate name format (LastName F.) due to duplicates
   const playersNeedingAltFormat = useMemo(() => {
@@ -127,7 +169,7 @@ const CourtsPanel = ({
       }`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded flex items-center justify-center ${
+            <div className={`panel-icon w-6 h-6 rounded flex items-center justify-center ${
               isDarkMode ? 'bg-cyan-500/20' : 'bg-cyan-100'
             }`}>
               <svg className={`w-4 h-4 ${isDarkMode ? 'text-cyan-500' : 'text-cyan-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -163,9 +205,12 @@ const CourtsPanel = ({
         </div>
       </div>
       
-      <div className={`p-1.5 flex-1 overflow-y-auto custom-scrollbar ${
-        useGrid ? 'grid grid-cols-2 gap-1.5 auto-rows-min' : 'space-y-1.5'
-      }`}>
+      <div
+        ref={courtGridRef}
+        className={`p-1.5 flex-1 overflow-y-auto custom-scrollbar ${
+          useGrid ? 'grid grid-cols-2 gap-1.5 auto-rows-min' : 'space-y-1.5'
+        }`}
+      >
         {courts.length === 0 ? (
           <div className={`text-center py-4 ${useGrid ? 'col-span-2' : ''} ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>
             <p className="text-xs">No courts</p>
@@ -189,7 +234,10 @@ const CourtsPanel = ({
             const courtStatus = court.match ? getCourtStatus(court.startTime) : 'empty';
             
             // Check if court was just assigned (within last 30 seconds)
-            const isNewlyAssigned = court.match && court.startTime && (currentTime - court.startTime) < 30000;
+            // How long a court keeps its "just assigned" green signal. The
+            // pulse itself is unchanged — this only extends how long it runs.
+            const NEWLY_ASSIGNED_MS = 30000;
+            const isNewlyAssigned = court.match && court.startTime && (currentTime - court.startTime) < NEWLY_ASSIGNED_MS;
             
             // Determine court card styling based on status
             let cardClass, headerClass, timerClass;
@@ -215,14 +263,16 @@ const CourtsPanel = ({
             // Add pulsating highlight for newly assigned courts.
             // '!' forces the yellow border to win over the status border color.
             const newlyAssignedClass = isNewlyAssigned 
-              ? `animate-pulse-border ${isDarkMode ? '' : '!border-yellow-500'}` 
+              ? `animate-pulse-border ${isDarkMode ? '' : '!border-emerald-500'}` 
               : '';
             
             return (
             <div
               key={court.id}
               ref={(el) => courtRefs.current[court.id] = el}
-              className={`rounded border overflow-hidden card-depth ${cardClass} ${newlyAssignedClass}`}
+              data-court-card={court.id}
+              data-flip-key={`c-${court.id}`}
+              className={`${freshCourtIds.current.has(court.id) ? 'animate-court-appear ' : ''}rounded border overflow-hidden card-depth ${cardClass} ${newlyAssignedClass}`}
             >
               {/* Status strip: cyan = live, amber = running long, red = overdue */}
               <div className={`court-strip h-[3px] ${
@@ -259,7 +309,7 @@ const CourtsPanel = ({
                         courtStatus === 'yellow' ? 'bg-amber-500' :
                         court.match ? 'bg-cyan-500' : (isDarkMode ? 'bg-slate-600' : 'bg-slate-400')
                       }`} />
-                      <span className={`font-medium text-sm uppercase ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{court.name}</span>
+                      <span className={`font-medium text-[0.8rem] uppercase ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{court.name}</span>
                       {court.match && (
                         <span className={`neon-timer text-xs font-medium tabular inline-flex items-center gap-0.5 ml-auto ${timerClass}`}>
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,7 +349,10 @@ const CourtsPanel = ({
                     {court.match.players.map((player) => (
                       <div
                         key={player.id}
+                        data-court-player={player.id}
                         className={`rounded px-2 py-1 flex items-center justify-between h-7 border ${
+                          player.id === highlightPlayerId ? 'card-search-found ' : ''
+                        }${
                           isDarkMode ? 'bg-slate-900/70 border-slate-700' : 'bg-white border-slate-300'
                         }`}
                       >
