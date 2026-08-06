@@ -320,23 +320,7 @@ const PlayerDatabaseModal = ({
                 Clear Pool ({poolPlayers.length + notPresentPlayers.length})
               </button>
             )}
-            {/* Remove Duplicate Players (repair) */}
-            <button
-              onClick={async () => {
-                if (await showConfirm('Clean up duplicate players by name (across the cloud and this device) and rewrite the cloud to match?')) {
-                  const removed = await onRemoveDuplicates();
-                  showAlert(removed > 0 ? `Cleaned up ${removed} duplicate entr(ies).` : 'No duplicates found.');
-                }
-              }}
-              className={`px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 text-xs border ${isDarkMode ? 'bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border-amber-500/30' : 'bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-400'}`}
-              title="De-duplicate players by name and fix the cloud copy"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
-              Remove Duplicates
-            </button>
-            {/* Export Button */}
+                        {/* Export Button */}
             <button
               onClick={handleExportCSV}
               className={`px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1.5 text-xs ${isDarkMode ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}

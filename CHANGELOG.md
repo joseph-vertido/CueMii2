@@ -14,6 +14,40 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.36.2] - 2026-07-17
+
+### Removed
+- The "Remove Duplicates" button in Manage Players. The underlying routine and
+  its wiring are left in place, so it can be restored with a single change.
+
+### Changed
+- The fingerprint reader now picks its capture resolution deterministically. It
+  resets to 500 DPI before each query, so a failed capabilities call can no
+  longer carry a previous reader's value over — that was how the same machine
+  could report 500 on one run and 508 on the next. If 500 isn't offered it now
+  chooses the *closest* available rather than the highest, logs the full list the
+  reader advertises, and warns when it has to settle for something else.
+
+### Notes
+- The reader change is in the fingerprint service — rebuild it for that to take
+  effect.
+
+## [4.36.1] - 2026-07-17
+
+### Changed
+- Fingerprint enrolment no longer makes you wait between presses. The reader
+  applied its full two-second check-in cooldown after every capture, including
+  the four presses enrolment asks for. Enrolment now uses a short 350ms gap —
+  long enough that one press can't register as several samples — while check-in
+  keeps the full cooldown. The full cooldown also applies once the fourth sample
+  lands, so a finger still on the reader can't immediately check in.
+- Live player records now write `deletedAt: 0` explicitly instead of omitting
+  the field, so every record has the same shape in Firebase.
+
+### Notes
+- The enrolment change is in the fingerprint service, not the app — rerun
+  `setup-fingerprint.bat` (or rebuild the service) for it to take effect.
+
 ## [4.36.0] - 2026-07-17
 
 ### Fixed

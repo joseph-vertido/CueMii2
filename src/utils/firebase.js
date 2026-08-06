@@ -102,6 +102,10 @@ export const syncPlayersToCloud = async (localPlayers, deletedPlayers = {}) => {
     batch.set(playerDoc, {
       ...player,
       deleted: false,
+      // Written explicitly rather than left off. batch.set replaces the whole
+      // document, so omitting it would drop the field entirely and make a live
+      // record look different in shape from a deleted one.
+      deletedAt: 0,
       updatedAt: player.updatedAt || Date.now(),
       syncedAt: serverTimestamp()
     });

@@ -59,6 +59,11 @@ namespace CueMiiFingerprintService
         // press produces one event (not one per captured frame). Also enforces a
         // lift-and-place gap between enrollment scans.
         private const int CooldownMs = 2000;
+        // Enrolling asks for four presses in a row, so the long check-in
+        // cooldown made each one feel unresponsive — you had to wait two
+        // seconds between them. A short gap is still needed so a single press
+        // isn't counted as several samples.
+        private const int EnrollCooldownMs = 350;
 
         public CaptureService(Store store) { _store = store; }
 
@@ -172,7 +177,15 @@ namespace CueMiiFingerprintService
                     consecutiveFailures = 0;
                     if (cr.Data == null) continue;
 
-                    if (ProcessFid(cr.Data)) Thread.Sleep(CooldownMs);
+                    if (ProcessFid(cr.Data))
+                    {
+                        // Read after processing: the last sample clears the flag,
+                        // so the full cooldown applies once enrolment finishes and
+                        // a lingering finger can't immediately check in.
+                        bool stillEnrolling;
+                        lock (_lock) { stillEnrolling = _enrolling; }
+                        Thread.Sleep(stillEnrolling ? EnrollCooldownMs : CooldownMs);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -245,18 +258,32 @@ namespace CueMiiFingerprintService
                 CloseReader();
                 return;
             }
+            // Feature extraction expects 500 DPI. Reset first so a failed
+            // capabilities query can't silently carry a previous reader's value
+            // over — that was how the same machine could report 500 one run and
+            // 508 the next.
+            _resolution = 500;
             try
             {
                 int[] resolutions = _reader.Capabilities.Resolutions;
-                // Feature extraction needs 500 DPI. Prefer 500, else the highest.
-                _resolution = 500;
-                if (Array.IndexOf(resolutions, 500) < 0 && resolutions.Length > 0)
+                if (resolutions != null && resolutions.Length > 0)
                 {
-                    _resolution = resolutions[0];
-                    foreach (int r in resolutions) if (r > _resolution) _resolution = r;
+                    Console.WriteLine("[reader] advertised resolutions: " + string.Join(", ", resolutions));
+                    if (Array.IndexOf(resolutions, 500) < 0)
+                    {
+                        // Pick the CLOSEST to 500 rather than the highest. Templates
+                        // are only comparable when captured at a consistent scale,
+                        // so straying as little as possible matters more than
+                        // detail.
+                        _resolution = resolutions[0];
+                        foreach (int r in resolutions)
+                            if (Math.Abs(r - 500) < Math.Abs(_resolution - 500)) _resolution = r;
+                        Console.WriteLine("[reader] WARNING: 500 DPI not offered; using " + _resolution +
+                                          ". Prints enrolled at a different resolution may match less reliably.");
+                    }
                 }
             }
-            catch (Exception ex) { Console.WriteLine("[reader] capabilities error: " + ex.Message); }
+            catch (Exception ex) { Console.WriteLine("[reader] capabilities error: " + ex.Message + " (assuming 500 DPI)"); }
             Console.WriteLine("[reader] connected (resolution " + _resolution + ")");
             Emit(new FpEvent { type = "reader", status = "connected" });
         }
