@@ -90,7 +90,12 @@ const AboutModal = ({
   const statusDisplay = getSyncStatusDisplay();
 
   // Check for updates function
-  const checkForUpdates = async () => {
+  /**
+   * @param {boolean} silent - when true, a failed check leaves no trace. Used
+   *   for the automatic check on open: a kiosk that's offline shouldn't greet
+   *   you with an error you didn't ask for.
+   */
+  const checkForUpdates = async (silent = false) => {
     setUpdateStatus('checking');
     setUpdateError('');
     
@@ -115,16 +120,23 @@ const AboutModal = ({
         setUpdateStatus('upToDate');
       }
     } catch (error) {
+      if (silent) {
+        // Leave the panel as it was — no banner, no message.
+        setUpdateStatus('idle');
+        setUpdateError('');
+        return;
+      }
       console.error('Update check failed:', error);
       setUpdateStatus('error');
       setUpdateError('Unable to check for updates');
     }
   };
 
-  // Auto-check for updates when modal opens
+  // Check for a newer version each time the window opens. Silent, so a machine
+  // that's offline simply shows nothing rather than an error.
   useEffect(() => {
-    if (isOpen && updateStatus === 'idle') {
-      checkForUpdates();
+    if (isOpen) {
+      checkForUpdates(true);
     }
   }, [isOpen]);
 

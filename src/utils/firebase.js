@@ -237,17 +237,21 @@ export const syncFingerprintsToCloud = async (fingerprintsMap) => {
     }
   }
 
-  // Upsert local enrollments. Each entry is { template, player }.
+  // Upsert local enrollments. Each entry is { template, player, enrolledAt }.
+  //
+  // An entry with no template is a deletion marker: the print was removed here,
+  // and the record is kept so other machines learn about it. Without that they'd
+  // see a player missing from the cloud, assume their own copy was newer, and
+  // upload it again — undoing the delete.
   for (const [playerId, entry] of Object.entries(fingerprintsMap)) {
     if (!entry) continue;
-    const template = typeof entry === 'string' ? entry : entry.template;
+    const template = typeof entry === 'string' ? entry : (entry.template || null);
     const player = typeof entry === 'string' ? null : (entry.player || null);
-    if (!template) continue;
     const enrolledAt = typeof entry === 'string' ? null : (entry.enrolledAt || null);
     batch.set(doc(db, 'fingerprints', playerId.toString()), {
-      template,
+      template,            // null marks a deleted print
       player,
-      enrolledAt,          // when the print was captured, for newest-wins merges
+      enrolledAt,          // when captured or removed, for newest-wins merges
       updatedAt: serverTimestamp(),
     });
   }
@@ -265,6 +269,10 @@ export const syncFingerprintsToCloud = async (fingerprintsMap) => {
  * lost. Where both hold a template for the same player, the newer `enrolledAt`
  * wins — previously the local copy always won, which meant an older template
  * could silently overwrite a fresh re-enrolment made on another machine.
+ *
+ * An entry with no template is a deletion marker. It takes part in the same
+ * comparison, so a delete beats an older enrolment and an enrolment made after
+ * the delete beats the marker.
  *
  * Entries predating this change have no timestamp. Those are treated as older
  * than any stamped entry, so a re-enrolment always takes precedence; if neither
@@ -295,9 +303,16 @@ export const fetchFingerprintsFromCloud = async () => {
   const map = {};
   snapshot.docs.forEach((d) => {
     const data = d.data();
-    if (data && data.template) {
+    if (!data) return;
+    // Records with no template are deletion markers and must be read back too,
+    // so the merge can apply the deletion here.
+    if (data.template || data.enrolledAt) {
       // enrolledAt must survive the round trip, or every merge would see 0.
-      map[d.id] = { template: data.template, player: data.player || null, enrolledAt: data.enrolledAt || 0 };
+      map[d.id] = {
+        template: data.template || null,
+        player: data.player || null,
+        enrolledAt: data.enrolledAt || 0,
+      };
     }
   });
   return map;

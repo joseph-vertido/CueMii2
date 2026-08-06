@@ -14,6 +14,33 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.35.0] - 2026-07-17
+
+### Changed
+- **Deleting a fingerprint now propagates to other machines.** Deleting clears
+  the template but keeps the record, stamped with the time of the deletion. That
+  marker is what other machines read on their next sync, so the print is removed
+  there too.
+  - Previously the record was dropped entirely. Another machine would then see a
+    player missing from the cloud, treat its own copy as the one to keep, and
+    upload it again — quietly undoing the deletion.
+  - A re-enrolment made after a deletion still wins, since it carries a later
+    time.
+- Syncing now replaces the scanner's enrolment set rather than adding to it, so
+  a print deleted elsewhere stops matching on this machine. Adding-only meant a
+  deleted print stayed live in the reader even after the app had removed it.
+- Deletion markers don't count as enrolled fingerprints: the Player Database
+  badge and the scanner both ignore them.
+
+## [4.34.4] - 2026-07-17
+
+### Changed
+- The About & License window checks for a newer version every time it opens, and
+  does so silently: if the machine is offline or GitHub can't be reached, the
+  panel simply shows nothing rather than an "Unable to check for updates"
+  message. Previously the check ran only when the window's state happened to be
+  untouched, and a failure surfaced as an error banner.
+
 ## [4.34.3] - 2026-07-17
 
 ### Added

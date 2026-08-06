@@ -633,8 +633,19 @@ function App() {
   const deletePlayerFingerprint = (playerId) => {
     setFingerprints(prev => {
       const next = { ...prev };
-      delete next[playerId];
-      delete next[String(playerId)];
+      // Clear the template but keep the record, stamped with the time of the
+      // delete. That marker is what tells other machines the print was removed —
+      // simply dropping the record would let them re-upload their own copy on
+      // the next sync and undo the deletion.
+      const key = next[playerId] !== undefined ? playerId : String(playerId);
+      const existing = next[key];
+      if (existing) {
+        next[key] = {
+          ...(typeof existing === 'string' ? {} : existing),
+          template: null,
+          enrolledAt: Date.now(),
+        };
+      }
       replaceEnrollments(next); // update the matching service so it stops matching
       if (cloudSyncEnabled && isFirebaseConfigured) {
         syncFingerprintsToCloud(next).catch(err =>
@@ -732,7 +743,11 @@ function App() {
         await syncFingerprintsToCloud(merged);
         // Write the merged templates into the service's enrollments.json now,
         // regardless of the reader's current status (listening or not).
-        await importEnrollments(merged);
+        //
+        // Replace rather than import: importing only adds, so a print deleted on
+        // another machine would stay in this scanner's set and keep matching.
+        // The merged map is the full picture, so replacing is safe here.
+        await replaceEnrollments(merged);
       } catch (err) {
         console.warn('Fingerprint manual sync failed:', err.message);
       }
@@ -3190,7 +3205,9 @@ function App() {
         isDarkMode={isDarkMode}
         licenseInfo={licenseInfo}
         totalPlayerCount={players.length}
-        fingerprintIds={Object.keys(fingerprints).map(id => Number(id))}
+        fingerprintIds={Object.entries(fingerprints)
+          .filter(([, entry]) => (typeof entry === 'string' ? entry : entry?.template))
+          .map(([id]) => Number(id))}
         fingerprints={fingerprints}
         onDeleteFingerprint={deletePlayerFingerprint}
         onResetAllFingerprints={resetAllFingerprints}
