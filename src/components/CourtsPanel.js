@@ -68,6 +68,20 @@ const CourtsPanel = ({
   // Determine grid columns based on panel width
   const useGrid = panelWidth >= 380;
   
+  // A search that narrows to one player scrolls their court into view, so the
+  // green highlight isn't off screen. Only scrolls when it's actually out of
+  // sight, so the panel doesn't shift around while typing.
+  useEffect(() => {
+    if (!highlightPlayerId) return;
+    const el = document.querySelector(`[data-court-player="${highlightPlayerId}"]`);
+    const container = courtGridRef.current;
+    if (!el || !container) return;
+    const row = el.getBoundingClientRect();
+    const view = container.getBoundingClientRect();
+    if (row.top >= view.top && row.bottom <= view.bottom) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightPlayerId]);
+
   // A newly assigned court sorts to the end of the list, so follow it all the
   // way to the bottom. Waits for the reorder to begin so the scroll travels with
   // the card rather than arriving before it has moved.
