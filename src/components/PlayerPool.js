@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { showConfirm } from '../utils/appAlert';
 import { SKILL_LEVELS } from '../data/initialData';
 import { formatWaitTime, getWaitTimeColor, getWaitTimeColorLight } from '../utils/formatters';
@@ -136,7 +136,29 @@ const PlayerPool = ({
     });
   };
 
+  // Grow a section smoothly when its contents change size, instead of the list
+  // snapping to its new height as cards are added or removed.
+  const useHeightTransition = (ref) => {
+    const previousHeight = useRef(null);
+    useLayoutEffect(() => {
+      const el = ref.current;
+      if (!el) return;
+      const height = el.offsetHeight;
+      const before = previousHeight.current;
+      previousHeight.current = height;
+      if (before === null || before === height) return;
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      el.animate(
+        [{ height: `${before}px` }, { height: `${height}px` }],
+        { duration: 300, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' }
+      );
+    });
+  };
+
   const availableGridRef = useRef(null);
+  const notPresentGridRef = useRef(null);
+  useHeightTransition(availableGridRef);
+  useHeightTransition(notPresentGridRef);
   useFlipList(availableGridRef);
 
   const playersOnCourt = filteredPoolPlayers
@@ -596,7 +618,7 @@ const PlayerPool = ({
                   No players waiting to arrive
                 </div>
               ) : (
-                <div className="flex flex-col gap-2">
+                <div ref={notPresentGridRef} className="flex flex-col gap-2">
                   {sortedLetters.map(letter => (
                     <div key={letter}>
                       <div className={`text-xs font-bold px-1 py-0.5 mb-1 ${

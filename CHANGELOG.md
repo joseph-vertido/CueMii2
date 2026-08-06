@@ -14,6 +14,93 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.34.3] - 2026-07-17
+
+### Added
+- When a pool search narrows to one player, the Match Queue or Courts panel now
+  scrolls that player into view, so the green highlight isn't left off screen.
+  - It only scrolls when the player is actually out of sight — if they're already
+    visible the panel stays where it is, so the view doesn't shift about while
+    you type.
+
+## [4.34.2] - 2026-07-17
+
+### Changed
+- The "Per Day" charts in Reports are hidden when a specific date is selected.
+  They're built from the full match history rather than the filtered set, so on a
+  single day they showed every other day alongside it — duplicating the figures
+  already given above. They still appear when viewing all dates, where a
+  day-by-day comparison is the point.
+
+## [4.34.1] - 2026-07-17
+
+### Fixed
+- The daily charts in Reports no longer spill outside their cards once enough
+  days have accumulated. Each column was set to share the width evenly with no
+  lower limit, but the date labels underneath can only shrink so far — so past a
+  certain number of days the row grew wider than the card and overflowed. Columns
+  now have a minimum width and the chart scrolls sideways when they no longer all
+  fit, keeping the bars and labels readable.
+- Printed reports lay the charts out in full instead of clipping them, since
+  there is nothing to scroll on paper.
+
+## [4.34.0] - 2026-07-17
+
+### Changed
+- **Syncing now keeps whichever copy is newer, rather than always preferring the
+  local one.**
+  - *Fingerprints* record when they were captured (`enrolledAt`), and merges keep
+    the most recent template for each player. Previously the local copy always
+    won, so an older template could silently overwrite a fresh re-enrolment made
+    on another machine. Players present on only one side are still kept, so
+    nothing is lost.
+  - *Player edits* now stamp an `updatedAt` time. The sync already had a
+    newest-wins rule for players, but nothing was writing the timestamp — so both
+    sides always compared as zero and local won by default. Adding, editing and
+    importing players all record the time.
+
+### Notes
+- Existing records have no timestamp. They're treated as older than any stamped
+  record, so a re-enrolment or edit always takes precedence over untouched data;
+  where neither side has one, the local copy is kept, matching the old behaviour.
+- The timestamp is written to and read back from Firebase, so the comparison
+  works across machines rather than only within one.
+
+## [4.33.1] - 2026-07-17
+
+### Fixed
+- Light Mode: the selected "Existing Player" / "+ New Player" tab in the Assign
+  Fingerprint window is now readable. It used one style for both themes — pale
+  cyan text on a pale cyan wash — which all but disappeared on a light
+  background. Light Mode now uses a solid cyan tab with white text.
+- Neon Mode: the tabs and the Cancel button in that window highlight on hover
+  again. The neon panel styling flattens their background, and that also
+  overrode their hover colour, so hovering had no visible effect. The selected
+  tab keeps its cyan identity and brightens slightly on hover.
+
+## [4.33.0] - 2026-07-17
+
+### Fixed
+- The level dropdown in the Assign Fingerprint window no longer opens behind it.
+  The dropdown sat below that dialog in the stacking order; it now sits above.
+- The Assign Fingerprint window's icon is a proper fingerprint, and in Neon Mode
+  it no longer lights up on hover — it's a label, not a button.
+
+### Added
+- Court buttons ease in as a match becomes complete, rather than popping into
+  place.
+- The Available and Not Present sections grow smoothly as players are added or
+  removed, instead of snapping to their new height.
+- Neon Mode now styles the Assign Fingerprint window — both the existing-player
+  and new-player sections.
+
+### Changed
+- The Match Queue only scrolls to the end when it should: after using Create, or
+  when the follow-on empty match is added once the last one is filled. A match
+  appearing for any other reason — returning from a court, or Smart Queue All —
+  leaves the scroll position alone. This is now driven by an explicit signal
+  rather than inferred.
+
 ## [4.32.8] - 2026-07-17
 
 ### Changed

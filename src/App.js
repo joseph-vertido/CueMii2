@@ -7,7 +7,7 @@ import { initialPlayers, initialCourts } from './data/initialData';
 import useCurrentTime from './hooks/useCurrentTime';
 import useLocalStorage from './hooks/useLocalStorage';
 import useCloudSync, { SYNC_STATUS } from './hooks/useCloudSync';
-import { syncFingerprintsToCloud, fetchFingerprintsFromCloud, syncPlayersToCloud, fetchPlayersFromCloud } from './utils/firebase';
+import { syncFingerprintsToCloud, fetchFingerprintsFromCloud, syncPlayersToCloud, fetchPlayersFromCloud, mergeFingerprintsByRecency } from './utils/firebase';
 import { replaceEnrollments, importEnrollments } from './utils/fingerprintService';
 import {
   Header,
@@ -110,6 +110,12 @@ function App() {
   const [lastEndedMatch, setLastEndedMatch] = useState(null); // For undo end match: { courtId, courtName, match, startTime, previousPoolPlayers, previousMatchHistory }
   const [scrollToCourtId, setScrollToCourtId] = useState(null); // For auto-scrolling to court when match is assigned
   const [scrollToMatchId, setScrollToMatchId] = useState(null); // Bring a match into view before players return to it
+
+  // Bumped only when the queue should jump to its end: the Create button, and
+  // the empty match added after the last one is filled. Matches appearing for
+  // any other reason — returning from a court, Smart Queue All — leave the
+  // scroll where it is.
+  const [queueBottomToken, setQueueBottomToken] = useState(0);
 
   // The last group to leave each court, so a match returned and then sent
   // straight back can resume its timer rather than starting from zero.
@@ -291,6 +297,7 @@ function App() {
         };
         setMatches(prev => [...prev, newMatch]);
         setNextMatchNumber(prev => prev + 1);
+        setQueueBottomToken(t => t + 1);
       }, 820);
       return () => clearTimeout(timer);
     }
@@ -362,14 +369,14 @@ function App() {
   // ==================== Player Database Functions ====================
   
   const addPlayer = (player) => {
-    setPlayers(prev => [...prev, player]);
+    setPlayers(prev => [...prev, { ...player, updatedAt: Date.now() }]);
   };
 
   // Add a player and return the new id (used by the fingerprint assign dialog
   // so it can immediately enroll the finger to the freshly created player).
   const addPlayerReturningId = (player) => {
     const id = Date.now();
-    setPlayers(prev => [...prev, { ...player, id }]);
+    setPlayers(prev => [...prev, { ...player, id, updatedAt: Date.now() }]);
     return id;
   };
 
@@ -385,7 +392,7 @@ function App() {
       }
     }
     if (uniqueNewPlayers.length > 0) {
-      setPlayers(prev => [...prev, ...uniqueNewPlayers]);
+      setPlayers(prev => [...prev, ...uniqueNewPlayers.map(p => ({ ...p, updatedAt: Date.now() }))]);
     }
 
     // Merge fingerprints, remapping each to the resolved player's id (by name),
@@ -398,7 +405,10 @@ function App() {
       const targetId = nameToId.get(np.name.trim().toLowerCase()) || np.id;
       fpToAdd[targetId] = {
         template: entry.template,
-        player: { id: targetId, name: np.name, gender: np.gender, level: np.level }
+        player: { id: targetId, name: np.name, gender: np.gender, level: np.level },
+        // Imported templates keep their original time where the file has one,
+        // so importing an old backup can't override a newer enrolment.
+        enrolledAt: entry.enrolledAt || Date.now()
       };
     }
 
@@ -417,7 +427,7 @@ function App() {
 
   const editPlayer = (updatedPlayer) => {
     // Update in players database
-    setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p));
+    setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? { ...updatedPlayer, updatedAt: Date.now() } : p));
     // Update in pool players (preserve joinedAt)
     setPoolPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? { ...updatedPlayer, joinedAt: p.joinedAt } : p));
     // Update in not present players
@@ -593,7 +603,7 @@ function App() {
     const player = p
       ? { id: p.id, name: p.name, gender: p.gender, level: p.level }
       : null;
-    const next = { ...fingerprints, [playerId]: { template, player } };
+    const next = { ...fingerprints, [playerId]: { template, player, enrolledAt: Date.now() } };
     setFingerprints(next);
 
     // Push to Firebase immediately (outside the state updater so it always runs).
@@ -614,7 +624,7 @@ function App() {
     if (!cloudSyncEnabled || !isFirebaseConfigured) return;
     fetchFingerprintsFromCloud()
       .then(cloudMap => {
-        setFingerprints(prev => ({ ...cloudMap, ...prev })); // local wins on conflict
+        setFingerprints(prev => mergeFingerprintsByRecency(cloudMap, prev));
       })
       .catch(err => console.warn('Fingerprint cloud fetch failed:', err.message));
   }, [cloudSyncEnabled, isFirebaseConfigured]);
@@ -717,7 +727,7 @@ function App() {
     if (isFirebaseConfigured) {
       try {
         const cloudMap = await fetchFingerprintsFromCloud();
-        const merged = { ...cloudMap, ...fingerprints }; // union; local wins on conflict
+        const merged = mergeFingerprintsByRecency(cloudMap, fingerprints);
         setFingerprints(merged);
         await syncFingerprintsToCloud(merged);
         // Write the merged templates into the service's enrollments.json now,
@@ -805,6 +815,7 @@ function App() {
     };
     setNextMatchNumber(prev => prev + 1);
     setMatches(prev => [...prev, newMatch]);
+    setQueueBottomToken(t => t + 1);
   };
 
   const deleteMatch = (matchId) => {
@@ -3079,6 +3090,7 @@ function App() {
             }
           }}>
             <MatchQueue
+              scrollToBottomToken={queueBottomToken}
               scrollToMatchId={scrollToMatchId}
               onScrolledToMatch={() => setScrollToMatchId(null)}
               highlightPlayerId={searchHighlightPlayerId}

@@ -243,15 +243,47 @@ export const syncFingerprintsToCloud = async (fingerprintsMap) => {
     const template = typeof entry === 'string' ? entry : entry.template;
     const player = typeof entry === 'string' ? null : (entry.player || null);
     if (!template) continue;
+    const enrolledAt = typeof entry === 'string' ? null : (entry.enrolledAt || null);
     batch.set(doc(db, 'fingerprints', playerId.toString()), {
       template,
       player,
+      enrolledAt,          // when the print was captured, for newest-wins merges
       updatedAt: serverTimestamp(),
     });
   }
 
   await batch.commit();
   return Object.keys(fingerprintsMap).length;
+};
+
+
+/**
+ * Merge two fingerprint maps, keeping whichever template was enrolled most
+ * recently for each player.
+ *
+ * Both sides are kept when a player only exists on one of them, so nothing is
+ * lost. Where both hold a template for the same player, the newer `enrolledAt`
+ * wins — previously the local copy always won, which meant an older template
+ * could silently overwrite a fresh re-enrolment made on another machine.
+ *
+ * Entries predating this change have no timestamp. Those are treated as older
+ * than any stamped entry, so a re-enrolment always takes precedence; if neither
+ * side has one, the local copy is kept, matching the old behaviour.
+ */
+export const mergeFingerprintsByRecency = (cloudMap = {}, localMap = {}) => {
+  const merged = { ...cloudMap };
+  for (const [playerId, localEntry] of Object.entries(localMap)) {
+    if (!localEntry) continue;
+    const cloudEntry = merged[playerId];
+    if (!cloudEntry) {
+      merged[playerId] = localEntry;
+      continue;
+    }
+    const localTime = localEntry.enrolledAt || 0;
+    const cloudTime = cloudEntry.enrolledAt || 0;
+    merged[playerId] = cloudTime > localTime ? cloudEntry : localEntry;
+  }
+  return merged;
 };
 
 // returns { [playerId]: templateBase64 }
@@ -264,7 +296,8 @@ export const fetchFingerprintsFromCloud = async () => {
   snapshot.docs.forEach((d) => {
     const data = d.data();
     if (data && data.template) {
-      map[d.id] = { template: data.template, player: data.player || null };
+      // enrolledAt must survive the round trip, or every merge would see 0.
+      map[d.id] = { template: data.template, player: data.player || null, enrolledAt: data.enrolledAt || 0 };
     }
   });
   return map;

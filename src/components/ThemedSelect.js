@@ -166,7 +166,8 @@ const ThemedSelect = ({
             top: coords.top,
             bottom: coords.bottom,
             width: coords.width,
-            zIndex: 60,
+            // Above the fingerprint assign dialog (z-80), which contains one.
+            zIndex: 90,
           }}
           className={`${coords.bottom !== undefined ? 'animate-panel-open-up' : 'animate-panel-open'} rounded-lg shadow-xl border overflow-hidden ${
             isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'

@@ -78,12 +78,16 @@ const FingerprintModal = ({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60">
-      <div className={`w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+      <div className={`neon-panel w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
         {/* Header */}
         <div className={`px-5 py-4 border-b flex items-center gap-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-          <div className="w-9 h-9 rounded-lg bg-cyan-600 flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11a5 5 0 0110 0c0 3-1 5-1 7M5 13a7 7 0 0113-3.5M12 11v3a6 6 0 001.5 4" />
+          <div className="fp-badge w-9 h-9 rounded-lg bg-cyan-600 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+              <path d="M18.9 7a8 8 0 0 1 1.1 5v1a6 6 0 0 0 .8 3" />
+              <path d="M8 11a4 4 0 0 1 8 0v1a10 10 0 0 0 2 6" />
+              <path d="M12 11v2a14 14 0 0 0 2.5 8" />
+              <path d="M8 15a18 18 0 0 0 1.8 6" />
+              <path d="M4.9 19a22 22 0 0 1 -.9 -7v-1a8 8 0 0 1 12 -6.95" />
             </svg>
           </div>
           <div>
@@ -121,13 +125,13 @@ const FingerprintModal = ({
             <div className="flex gap-1 mb-3">
               <button
                 onClick={() => setMode('existing')}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mode === 'existing' ? 'bg-cyan-500/20 text-cyan-300' : isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                className={`fp-btn flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mode === 'existing' ? (isDarkMode ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-600 text-white shadow-sm') : (isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')}`}
               >
                 Existing Player
               </button>
               <button
                 onClick={() => setMode('new')}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mode === 'new' ? 'bg-cyan-500/20 text-cyan-300' : isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                className={`fp-btn flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${mode === 'new' ? (isDarkMode ? 'bg-cyan-500/20 text-cyan-300' : 'bg-cyan-600 text-white shadow-sm') : (isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200')}`}
               >
                 + New Player
               </button>
@@ -217,7 +221,7 @@ const FingerprintModal = ({
         <div className={`px-5 py-4 border-t flex gap-2 ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
           <button
             onClick={handleCancel}
-            className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+            className={`fp-btn flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
           >
             Cancel
           </button>

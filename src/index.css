@@ -1390,3 +1390,63 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .animate-bounce-top { animation: none; }
 }
+
+/* Neon: the Assign Fingerprint dialog. The icon badge is a plain marker, not a
+   button, so it keeps its flat fill instead of the lit tile treatment. */
+.neon .fp-badge {
+  background-color: #03212b !important;
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  box-shadow: none;
+}
+
+.neon .fp-badge:hover {
+  box-shadow: none;
+}
+
+.neon .fp-badge svg {
+  color: #5ff5ff !important;
+  filter: none;
+}
+
+/* Court-assign buttons easing in as a match becomes complete */
+@keyframes court-button-in {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.94); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-court-button-in {
+  animation: court-button-in 0.26s var(--motion-ease) both;
+}
+
+/* Pool sections growing as players arrive, rather than snapping to size */
+.pool-section-grow {
+  transition: max-height 0.32s var(--motion-ease);
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-court-button-in { animation: none; }
+  .pool-section-grow { transition: none; }
+}
+
+/* Neon: the Assign Fingerprint dialog's tabs and Cancel button.
+   The panel rule flattens .bg-slate-800 to the deep neon surface, which also
+   beat their hover classes — so hovering did nothing. These restore it. */
+.neon .neon-panel .fp-btn:hover {
+  background-color: #12202e !important;
+  color: #e2e8f0 !important;
+}
+
+/* The selected tab keeps its cyan identity and doesn't shift on hover. */
+.neon .neon-panel .fp-btn.bg-cyan-500\/20,
+.neon .neon-panel .fp-btn.bg-cyan-600 {
+  background-color: #04222b !important;
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  color: #7ee9f5 !important;
+}
+
+.neon .neon-panel .fp-btn.bg-cyan-500\/20:hover,
+.neon .neon-panel .fp-btn.bg-cyan-600:hover {
+  background-color: #06303c !important;
+  color: #9df3fb !important;
+}

@@ -889,6 +889,16 @@ const ReportsModal = ({
                 padding: 8mm 6mm !important;
               }
 
+              /* The daily charts scroll horizontally on screen when there are
+                 many days. Printed, there is nothing to scroll — so let them lay
+                 out in full and shrink the columns to fit the page width. */
+              .report-content .overflow-x-auto {
+                overflow: visible !important;
+              }
+              .report-content [class*="min-w-["] {
+                min-width: 0 !important;
+              }
+
               /* Tables: shrink to fit rather than run off the page */
               table {
                 width: 100% !important;
@@ -1242,20 +1252,24 @@ const ReportsModal = ({
                   </Card>
                   </div>
 
-                  {/* Daily Charts */}
-                  {dailyChartData.length > 1 && (
+                  {/* Daily Charts.
+                      Only shown when viewing all dates: they're built from the
+                      full history rather than the filtered set, so on a single
+                      selected day they'd either repeat the figures already shown
+                      above or, worse, show every other day's as well. */}
+                  {selectedDate === 'all' && dailyChartData.length > 1 && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                       {/* Unique Players Per Day */}
                       <div className={`rounded-xl p-4 ${isDarkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
                         <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
                           Unique Players Per Day
                         </h3>
-                        <div className="flex items-end gap-1 h-32">
+                        <div className="flex items-end gap-1 h-32 overflow-x-auto overflow-y-hidden custom-scrollbar pb-1">
                           {dailyChartData.map((day, idx) => {
                             const maxPlayers = Math.max(...dailyChartData.map(d => d.uniquePlayers));
                             const height = maxPlayers > 0 ? (day.uniquePlayers / maxPlayers) * 100 : 0;
                             return (
-                              <div key={idx} className="flex-1 flex flex-col items-center">
+                              <div key={idx} className="flex-1 min-w-[34px] flex flex-col items-center">
                                 <div className="w-full flex flex-col items-center justify-end h-24">
                                   <span className={`text-xs mb-1 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                                     {day.uniquePlayers}
@@ -1279,12 +1293,12 @@ const ReportsModal = ({
                         <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
                           Total Matches Per Day
                         </h3>
-                        <div className="flex items-end gap-1 h-32">
+                        <div className="flex items-end gap-1 h-32 overflow-x-auto overflow-y-hidden custom-scrollbar pb-1">
                           {dailyChartData.map((day, idx) => {
                             const maxMatches = Math.max(...dailyChartData.map(d => d.totalMatches));
                             const height = maxMatches > 0 ? (day.totalMatches / maxMatches) * 100 : 0;
                             return (
-                              <div key={idx} className="flex-1 flex flex-col items-center">
+                              <div key={idx} className="flex-1 min-w-[34px] flex flex-col items-center">
                                 <div className="w-full flex flex-col items-center justify-end h-24">
                                   <span className={`text-xs mb-1 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
                                     {day.totalMatches}
@@ -1308,7 +1322,7 @@ const ReportsModal = ({
                         <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
                           Avg Wait Time Per Day
                         </h3>
-                        <div className="flex items-end gap-1 h-32">
+                        <div className="flex items-end gap-1 h-32 overflow-x-auto overflow-y-hidden custom-scrollbar pb-1">
                           {dailyChartData.map((day, idx) => {
                             const maxWait = Math.max(...dailyChartData.map(d => d.avgWaitTime));
                             const height = maxWait > 0 ? (day.avgWaitTime / maxWait) * 100 : 0;
@@ -1327,7 +1341,7 @@ const ReportsModal = ({
                               ? (isDarkMode ? 'bg-orange-500' : 'bg-orange-400')
                               : (isDarkMode ? 'bg-red-500' : 'bg-red-400');
                             return (
-                              <div key={idx} className="flex-1 flex flex-col items-center">
+                              <div key={idx} className="flex-1 min-w-[34px] flex flex-col items-center">
                                 <div className="w-full flex flex-col items-center justify-end h-24">
                                   <span className={`text-xs mb-1 ${textColor}`}>
                                     {day.avgWaitTime}m

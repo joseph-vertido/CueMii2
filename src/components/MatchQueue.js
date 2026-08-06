@@ -24,6 +24,7 @@ const MatchQueue = ({
   addExternalPlayerToMatch,
   highlightPlayerId,
   scrollToMatchId,
+  scrollToBottomToken,
   onScrolledToMatch,
   movePlayerBetweenMatches,
   togglePreferredCourt,
@@ -81,7 +82,6 @@ const MatchQueue = ({
   const seenMatchIds = useRef(null);
   const freshMatchIds = useRef(new Set());
   const holdNewMatch = useRef(false);
-  const skipBottomScroll = useRef(false);
   const [, forceRevealRender] = useState(0);
   const matchIdList = matches.map(m => m.id);
   if (seenMatchIds.current === null) {
@@ -93,10 +93,6 @@ const MatchQueue = ({
       // Set here, in the same pass that spots the new match, so it is already
       // hidden on the first paint rather than a frame later.
       holdNewMatch.current = true;
-      // A match arriving back from a court is scrolled to by id; anything else
-      // is a brand-new match at the end of the list. Decided here, once —
-      // re-checking later would flip when the scroll target is cleared.
-      skipBottomScroll.current = !!scrollToMatchId;
       seenMatchIds.current = new Set(matchIdList);
     } else if (matchIdList.length !== seenMatchIds.current.size) {
       seenMatchIds.current = new Set(matchIdList);
@@ -110,10 +106,6 @@ const MatchQueue = ({
     // scrollIntoView with 'nearest' stops as soon as the card is on screen,
     // which often left the list short of the end. Drive the container instead.
     // (A match returning from a court is scrolled to by scrollToMatchId above.)
-    const container = matchListRef.current;
-    if (container && !skipBottomScroll.current) {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-    }
     const reveal = setTimeout(() => {
       holdNewMatch.current = false;
       forceRevealRender(n => n + 1);
@@ -126,6 +118,31 @@ const MatchQueue = ({
   }, [matches]);
   const scrollContainerRef = useRef(null);
   const matchListRef = useRef(null);
+
+  // Jump to the end of the queue, but only when the app asks for it.
+  const seenBottomToken = useRef(scrollToBottomToken);
+  useEffect(() => {
+    if (scrollToBottomToken === seenBottomToken.current) return;
+    seenBottomToken.current = scrollToBottomToken;
+    const container = matchListRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    }
+  }, [scrollToBottomToken]);
+
+  // A search that narrows to one player scrolls them into view, so the green
+  // highlight isn't sitting somewhere off screen. Only scrolls when the slot is
+  // actually out of sight, to avoid nudging the list around while typing.
+  useEffect(() => {
+    if (!highlightPlayerId) return;
+    const el = document.querySelector(`[data-slot-player="${highlightPlayerId}"]`);
+    const container = matchListRef.current;
+    if (!el || !container) return;
+    const slot = el.getBoundingClientRect();
+    const view = container.getBoundingClientRect();
+    if (slot.top >= view.top && slot.bottom <= view.bottom) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightPlayerId]);
 
   // Bring a specific match into view — used when players are on their way back
   // to it from a court, so they don't fly to a slot that's off screen.
@@ -1079,7 +1096,7 @@ const MatchQueue = ({
                             <button
                               key={court.id}
                               onClick={() => moveMatchToCourt(match.id, court.id)}
-                              className={`flex-1 ${buttonClass} h-5 text-[11px] font-bold uppercase rounded transition-colors flex items-center justify-center gap-1`}
+                              className={`animate-court-button-in flex-1 ${buttonClass} h-5 text-[11px] font-bold uppercase rounded transition-colors flex items-center justify-center gap-1`}
                               title={isWantedByHigher && !hasPreferredCourts ? 'Other matches are waiting for this court' : ''}
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
