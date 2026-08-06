@@ -2,7 +2,7 @@
 // NOTE: Keep this in sync with the "version" field in package.json.
 // Run `npm run version:patch|minor|major` (or node scripts/bump-version.js)
 // to update both automatically. See CHANGELOG.md for release history.
-export const APP_VERSION = '4.35.0';
+export const APP_VERSION = '4.35.1';
 
 // Player roster is sourced from cloud sync (Firebase), not seeded locally.
 // Starting empty avoids seed-vs-cloud ID collisions that duplicated players.

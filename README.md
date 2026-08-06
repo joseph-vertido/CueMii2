@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 4.35.0**
+**Version 4.35.1**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -252,6 +252,8 @@ and compares it to the running `APP_VERSION`. Once a bumped version is pushed to
 > below is retained for legacy history.
 
 ## Version History
+
+- **v4.35.1** - Deleted prints no longer show as enrolled; fingerprint icon marker
 
 - **v4.35.0** - Fingerprint deletions propagate across machines
 

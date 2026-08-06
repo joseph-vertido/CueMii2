@@ -14,6 +14,18 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.35.1] - 2026-07-17
+
+### Fixed
+- The Assign Fingerprint dialog no longer marks players as enrolled after their
+  print has been deleted. It was counting the presence of a record rather than
+  whether that record still holds a template — and since 4.35.0 keeps a marker
+  behind so deletions can propagate, those markers read as enrolments.
+
+### Changed
+- That marker is now a green fingerprint icon instead of a dot, matching the one
+  used in the Player Database.
+
 ## [4.35.0] - 2026-07-17
 
 ### Changed

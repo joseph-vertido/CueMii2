@@ -3265,7 +3265,10 @@ function App() {
       <FingerprintController
         players={players}
         enrollments={fingerprints}
-        enrolledPlayerIds={Object.keys(fingerprints).map(id => Number(id))}
+        enrolledPlayerIds={Object.entries(fingerprints)
+          // A record with no template is a deletion marker, not an enrolment.
+          .filter(([, entry]) => (typeof entry === 'string' ? entry : entry?.template))
+          .map(([id]) => Number(id))}
         getPlayerById={(id) => players.find(p => p.id === id) || ((fingerprints[id] || fingerprints[String(id)] || {}).player) || null}
         onCheckIn={checkInPlayerById}
         onEnroll={handleFingerprintEnroll}
