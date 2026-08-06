@@ -65,6 +65,11 @@ function App() {
   const [notPresentPlayers, setNotPresentPlayers] = useLocalStorage('baddixx_notPresent', []); // Players added but not yet available
   // Fingerprint enrollments: { [playerId]: string[] } (captured samples/templates)
   const [fingerprints, setFingerprints] = useLocalStorage('baddixx_fingerprints', {});
+
+  // Players deleted here, kept as { [id]: { id, name, deletedAt } } so the
+  // deletion can be told to other machines. Without a marker they'd see a player
+  // the cloud is missing, assume it was never synced, and upload it back.
+  const [deletedPlayers, setDeletedPlayers] = useLocalStorage('baddixx_deletedPlayers', {});
   const [matches, setMatches] = useLocalStorage('baddixx_matches', []);
   const [courts, setCourts] = useLocalStorage('baddixx_courts', initialCourts);
   const [nextMatchNumber, setNextMatchNumber] = useLocalStorage('baddixx_nextMatchNumber', 1);
@@ -87,7 +92,7 @@ function App() {
     isOnline,
     performSync,
     isFirebaseConfigured
-  } = useCloudSync(players, setPlayers, cloudSyncEnabled);
+  } = useCloudSync(players, setPlayers, cloudSyncEnabled, deletedPlayers, setDeletedPlayers);
   
   // UI State (not persisted)
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
@@ -368,14 +373,40 @@ function App() {
 
   // ==================== Player Database Functions ====================
   
+  /**
+   * If this name was deleted before, reuse that player's original id and drop
+   * the marker — re-adding someone restores their identity rather than creating
+   * a second record, and the later timestamp stops the next sync deleting them
+   * again.
+   */
+  const reviveDeletedId = (name) => {
+    const key = (name || '').trim().toLowerCase();
+    if (!key) return null;
+    const match = Object.values(deletedPlayers)
+      .find(t => (t.name || '').trim().toLowerCase() === key);
+    if (!match) return null;
+    setDeletedPlayers(prev => {
+      const next = { ...prev };
+      delete next[match.id];
+      delete next[String(match.id)];
+      return next;
+    });
+    return match.id;
+  };
+
   const addPlayer = (player) => {
-    setPlayers(prev => [...prev, { ...player, updatedAt: Date.now() }]);
+    const revivedId = reviveDeletedId(player.name);
+    setPlayers(prev => [...prev, {
+      ...player,
+      id: revivedId ?? player.id,
+      updatedAt: Date.now(),
+    }]);
   };
 
   // Add a player and return the new id (used by the fingerprint assign dialog
   // so it can immediately enroll the finger to the freshly created player).
   const addPlayerReturningId = (player) => {
-    const id = Date.now();
+    const id = reviveDeletedId(player.name) ?? Date.now();
     setPlayers(prev => [...prev, { ...player, id, updatedAt: Date.now() }]);
     return id;
   };
@@ -453,6 +484,17 @@ function App() {
   };
 
   const deletePlayer = (playerId) => {
+    const removed = players.find(p => p.id === playerId);
+    if (removed) {
+      setDeletedPlayers(prev => ({
+        ...prev,
+        [playerId]: { id: playerId, name: removed.name || '', deletedAt: Date.now() },
+      }));
+    }
+    // A deleted player shouldn't still be able to check in by finger.
+    if (fingerprints[playerId] || fingerprints[String(playerId)]) {
+      deletePlayerFingerprint(playerId);
+    }
     setPlayers(prev => prev.filter(p => p.id !== playerId));
     setPoolPlayers(prev => prev.filter(p => p.id !== playerId));
     setNotPresentPlayers(prev => prev.filter(p => p.id !== playerId));
@@ -695,7 +737,9 @@ function App() {
     setPlayers(deduped);
     if (isFirebaseConfigured && cloudSyncEnabled) {
       try {
-        await syncPlayersToCloud(deduped); // cloud = deduped set (extras deleted)
+        // Pass the markers too, or this push would wipe them from the cloud and
+        // let deleted players return on the next sync.
+        await syncPlayersToCloud(deduped, deletedPlayers);
       } catch (err) {
         console.warn('Dedupe cloud push failed:', err.message);
       }
@@ -711,21 +755,39 @@ function App() {
     setFingerprints(prev => {
       let changed = false;
       const next = { ...prev };
+      const staleInService = [];
       for (const [id, template] of Object.entries(serviceMap)) {
         if (!template) continue;
-        const key = next[id] ? id : (next[Number(id)] ? Number(id) : id);
+        const key = next[id] !== undefined ? id : (next[Number(id)] !== undefined ? Number(id) : id);
         const existing = next[key];
         if (existing) {
-          if (!existing.template) { next[key] = { ...existing, template }; changed = true; }
+          // A record with no template is a deletion marker, not a gap waiting to
+          // be filled. Refilling it from the reader would undo the delete — and
+          // the reader is the one holding the outdated copy, so it gets cleaned
+          // up below instead.
+          if (!existing.template) {
+            staleInService.push(id);
+            continue;
+          }
         } else {
           const pl = players.find(p => String(p.id) === String(id));
           next[id] = {
             template,
-            player: pl ? { id: pl.id, name: pl.name, gender: pl.gender, level: pl.level } : null
+            player: pl ? { id: pl.id, name: pl.name, gender: pl.gender, level: pl.level } : null,
+            // Stamped, so a print discovered from the reader takes part in
+            // newest-wins merges instead of always losing as an undated entry.
+            enrolledAt: Date.now()
           };
           changed = true;
         }
       }
+
+      // Push the corrected set back so the reader stops matching prints the app
+      // has deleted.
+      if (staleInService.length > 0) {
+        replaceEnrollments(next);
+      }
+
       return changed ? next : prev;
     });
   };

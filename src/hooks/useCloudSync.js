@@ -21,7 +21,7 @@ export const SYNC_STATUS = {
   NOT_CONFIGURED: 'not_configured'
 };
 
-export const useCloudSync = (players, setPlayers, enabled = true) => {
+export const useCloudSync = (players, setPlayers, enabled = true, deletedPlayers = {}, setDeletedPlayers = null) => {
   const [syncStatus, setSyncStatus] = useState(SYNC_STATUS.IDLE);
   const [lastSyncTime, setLastSyncTime] = useState(() => {
     const saved = localStorage.getItem('baddixx_lastSyncTime');
@@ -31,11 +31,15 @@ export const useCloudSync = (players, setPlayers, enabled = true) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const pendingSyncRef = useRef(false);
   const playersRef = useRef(players);
+  // Kept in a ref for the same reason as players: the sync callback is created
+  // once and would otherwise close over a stale copy.
+  const deletedPlayersRef = useRef(deletedPlayers);
   
   // Keep players ref updated
   useEffect(() => {
     playersRef.current = players;
-  }, [players]);
+    deletedPlayersRef.current = deletedPlayers;
+  }, [players, deletedPlayers]);
 
   // Monitor online status
   useEffect(() => {
@@ -86,7 +90,12 @@ export const useCloudSync = (players, setPlayers, enabled = true) => {
       setSyncStatus(SYNC_STATUS.SYNCING);
       setSyncError(null);
       
-      const result = await twoWaySync(playersRef.current, setPlayers);
+      const result = await twoWaySync(
+        playersRef.current,
+        setPlayers,
+        deletedPlayersRef.current,
+        setDeletedPlayers
+      );
       
       const now = Date.now();
       setLastSyncTime(now);

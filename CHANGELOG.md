@@ -14,6 +14,39 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.36.0] - 2026-07-17
+
+### Fixed
+- **Deleted players no longer come back after syncing.** Deleting a player now
+  records a marker that travels to the cloud, so other machines learn the player
+  was removed. Previously the record was simply dropped, and any machine that
+  still had it treated it as one the cloud was missing and uploaded it again.
+  - The marker keeps propagating until every machine has seen it, so a device
+    that syncs days later still applies the deletion.
+  - Remove Duplicates preserves the markers too — pushing without them would have
+    cleared them from the cloud and let deleted players return.
+
+### Added
+- **Re-adding a player with the same name restores their original ID.** The
+  marker holds the name, so adding that person again reuses their previous
+  identity instead of creating a second record, and the newer timestamp stops
+  the next sync deleting them again.
+- Deleting a player now also removes their fingerprint, so they can't still check
+  themselves in by finger.
+
+## [4.35.2] - 2026-07-17
+
+### Fixed
+- A deleted fingerprint could come back. When the app reconciles what the reader
+  service reports, it treated a record with no template as a gap to fill — but
+  since 4.35.0 that's a deletion marker, so any copy still sitting in the
+  reader's file was written straight back over the delete. The marker is now
+  respected, and the corrected set is pushed to the reader so it stops matching
+  the removed print.
+- Prints discovered from the reader are now timestamped. Without one they always
+  lost a newest-wins comparison, so a print known only to the reader could be
+  overwritten by any stamped record.
+
 ## [4.35.1] - 2026-07-17
 
 ### Fixed

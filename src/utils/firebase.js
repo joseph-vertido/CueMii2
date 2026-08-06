@@ -63,7 +63,17 @@ export { db, isInitialized, initError };
 /**
  * Sync player database to cloud
  */
-export const syncPlayersToCloud = async (localPlayers) => {
+/**
+ * Push the local player set to the cloud.
+ *
+ * @param {Array} localPlayers - live players
+ * @param {Object} deletedPlayers - { [id]: { id, name, deletedAt } } tombstones.
+ *   These are written as records marked deleted rather than removed, so other
+ *   machines learn that the player was deleted. Without them, a machine that
+ *   still has the player would treat it as one the cloud is missing and upload
+ *   it again — resurrecting it.
+ */
+export const syncPlayersToCloud = async (localPlayers, deletedPlayers = {}) => {
   if (!db || !isInitialized) {
     throw new Error('Firebase not initialized');
   }
@@ -76,19 +86,35 @@ export const syncPlayersToCloud = async (localPlayers) => {
   const cloudPlayerIds = new Set(cloudSnapshot.docs.map(doc => doc.id));
   const localPlayerIds = new Set(localPlayers.map(p => p.id.toString()));
   
-  // Delete players that exist in cloud but not locally
+  const deletedIds = new Set(Object.keys(deletedPlayers).map(String));
+
+  // Remove cloud records this machine knows nothing about. Anything we hold a
+  // deletion marker for is written below instead, so the deletion travels.
   for (const cloudId of cloudPlayerIds) {
-    if (!localPlayerIds.has(cloudId)) {
+    if (!localPlayerIds.has(cloudId) && !deletedIds.has(cloudId)) {
       batch.delete(doc(db, 'players', cloudId));
     }
   }
-  
+
   // Add/update local players to cloud
   for (const player of localPlayers) {
     const playerDoc = doc(db, 'players', player.id.toString());
     batch.set(playerDoc, {
       ...player,
-      updatedAt: serverTimestamp(),
+      deleted: false,
+      updatedAt: player.updatedAt || Date.now(),
+      syncedAt: serverTimestamp()
+    });
+  }
+
+  // Write the deletion markers.
+  for (const [id, tombstone] of Object.entries(deletedPlayers)) {
+    batch.set(doc(db, 'players', id.toString()), {
+      id: tombstone.id ?? (parseInt(id, 10) || id),
+      name: tombstone.name || '',
+      deleted: true,
+      deletedAt: tombstone.deletedAt || Date.now(),
+      updatedAt: tombstone.deletedAt || Date.now(),
       syncedAt: serverTimestamp()
     });
   }
@@ -115,6 +141,9 @@ export const fetchPlayersFromCloud = async () => {
     return {
       ...data,
       id: parseInt(doc.id) || doc.id,
+      // Deleted records come back too, so the merge can apply the deletion here.
+      deleted: data.deleted === true,
+      deletedAt: data.deletedAt?.toMillis?.() || data.deletedAt || 0,
       updatedAt: data.updatedAt?.toMillis?.() || data.updatedAt,
       syncedAt: data.syncedAt?.toMillis?.() || data.syncedAt
     };
@@ -129,14 +158,35 @@ export const fetchPlayersFromCloud = async () => {
  * Two-way sync: merge local and cloud data
  * Strategy: Last-write-wins based on updatedAt timestamp
  */
-export const twoWaySync = async (localPlayers, setPlayers) => {
+/**
+ * Merge the local and cloud player sets.
+ *
+ * @param {Array} localPlayers - live players on this machine
+ * @param {Function} setPlayers
+ * @param {Object} localDeleted - { [id]: { id, name, deletedAt } }
+ * @param {Function} setDeleted
+ */
+export const twoWaySync = async (localPlayers, setPlayers, localDeleted = {}, setDeleted = null) => {
   if (!db || !isInitialized) {
     throw new Error('Firebase not initialized');
   }
 
   // Fetch cloud players
-  const cloudPlayers = await fetchPlayersFromCloud();
-  
+  const cloudRecords = await fetchPlayersFromCloud();
+  const cloudPlayers = cloudRecords.filter(p => !p.deleted);
+
+  // Deletion markers from both sides, newest kept per id.
+  const tombstones = { ...localDeleted };
+  for (const rec of cloudRecords) {
+    if (!rec.deleted) continue;
+    const id = rec.id.toString();
+    const existing = tombstones[id];
+    const cloudTime = rec.deletedAt || rec.updatedAt || 0;
+    if (!existing || cloudTime > (existing.deletedAt || 0)) {
+      tombstones[id] = { id: rec.id, name: rec.name || '', deletedAt: cloudTime };
+    }
+  }
+
   // Create maps for easy lookup
   const localMap = new Map(localPlayers.map(p => [p.id.toString(), p]));
   const cloudMap = new Map(cloudPlayers.map(p => [p.id.toString(), p]));
@@ -177,7 +227,25 @@ export const twoWaySync = async (localPlayers, setPlayers) => {
       byName.set(key, p);
     }
   }
-  const finalPlayers = [...byName.values(), ...unnamed];
+  let finalPlayers = [...byName.values(), ...unnamed];
+
+  // Apply the deletion markers. A player stays deleted unless they were edited
+  // or re-created after the deletion — that later timestamp is what allows a
+  // re-added player to come back rather than being wiped again on every sync.
+  const survivingTombstones = {};
+  finalPlayers = finalPlayers.filter(p => {
+    const mark = tombstones[p.id.toString()];
+    if (!mark) return true;
+    if ((p.updatedAt || 0) > (mark.deletedAt || 0)) return true; // re-added since
+    survivingTombstones[p.id.toString()] = mark;
+    return false;
+  });
+  // Keep markers for players nobody holds any more, so the deletion keeps
+  // propagating to machines that haven't synced yet.
+  for (const [id, mark] of Object.entries(tombstones)) {
+    if (!finalPlayers.some(p => p.id.toString() === id)) survivingTombstones[id] = mark;
+  }
+  if (setDeleted) setDeleted(survivingTombstones);
 
   if (finalPlayers.length !== mergedPlayers.length) {
     console.warn(`[sync] collapsed ${mergedPlayers.length} -> ${finalPlayers.length} players by name (local=${localPlayers.length}, cloud=${cloudPlayers.length})`);
@@ -187,7 +255,7 @@ export const twoWaySync = async (localPlayers, setPlayers) => {
   setPlayers(finalPlayers);
 
   // Push cleaned data back to cloud (removes any extra cloud copies)
-  await syncPlayersToCloud(finalPlayers);
+  await syncPlayersToCloud(finalPlayers, survivingTombstones);
 
   return {
     totalPlayers: finalPlayers.length,
