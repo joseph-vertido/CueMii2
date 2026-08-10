@@ -77,8 +77,14 @@ const FingerprintModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60">
-      <div className={`neon-panel w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60"
+      onClick={handleCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`neon-panel w-full max-w-md rounded-2xl shadow-2xl border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}
+      >
         {/* Header */}
         <div className={`px-5 py-4 border-b flex items-center gap-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
           <div className="fp-badge w-9 h-9 rounded-lg bg-cyan-600 flex items-center justify-center flex-shrink-0">
@@ -204,7 +210,15 @@ const FingerprintModal = ({
                       <button
                         key={g}
                         onClick={() => setNewPlayer({ ...newPlayer, gender: g })}
-                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${newPlayer.gender === g ? (g === 'female' ? 'bg-pink-500/20 text-pink-300' : 'bg-blue-500/20 text-blue-300') : isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        className={`fp-btn flex-1 px-3 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                          newPlayer.gender === g
+                            ? (g === 'female'
+                                ? (isDarkMode ? 'bg-pink-500/20 text-pink-300' : 'bg-pink-500 text-white shadow-sm')
+                                : (isDarkMode ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-600 text-white shadow-sm'))
+                            : (isDarkMode
+                                ? 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-300')
+                        }`}
                       >
                         {g}
                       </button>

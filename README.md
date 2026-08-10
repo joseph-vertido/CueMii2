@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 4.36.2**
+**Version 4.36.22**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -252,6 +252,46 @@ and compares it to the running `APP_VERSION`. Once a bumped version is pushed to
 > below is retained for legacy history.
 
 ## Version History
+
+- **v4.36.22** - Reader presence read from the driver device list
+
+- **v4.36.21** - No false disconnect when the reader entry cannot be identified
+
+- **v4.36.20** - Reader presence read from Windows, not the caching SDK
+
+- **v4.36.19** - Health check cross-checks Windows enumeration; adds heartbeat logging
+
+- **v4.36.18** - Reader fault acted on at the first failed check
+
+- **v4.36.17** - Disconnect detection restored via allow-list health check
+
+- **v4.36.16** - Reader status returns to listening; full status path reviewed
+
+- **v4.36.15** - Fixed reader wrongly reporting permanently disconnected
+
+- **v4.36.14** - Reader recovers to listening after reconnecting
+
+- **v4.36.13** - Health check on its own thread; enrollment window fixes
+
+- **v4.36.12** - Fixed scans not registering and disconnect detection
+
+- **v4.36.11** - Fixed service build error from removed properties
+
+- **v4.36.10** - No reconnects on health check; no check-in delay
+
+- **v4.36.9** - Reader health checked via status query instead of reconnecting
+
+- **v4.36.8** - Service reports its SDK notification events at startup
+
+- **v4.36.7** - Presence check runs on suspicion rather than a fixed timer
+
+- **v4.36.6** - Reader disconnects detected via re-open probe
+
+- **v4.36.5** - Faster, more reliable reader disconnect detection
+
+- **v4.36.4** - Reader disconnection is detected and reported
+
+- **v4.36.3** - Reverted the reader resolution change
 
 - **v4.36.2** - Removed Remove Duplicates; deterministic reader resolution
 

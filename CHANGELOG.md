@@ -14,6 +14,323 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.36.22] - 2026-07-17
+
+### Fixed
+- A working reader was reported as unplugged. The check relied on the device's
+  "Control" registry subkey, which exists while hardware is attached — but that
+  key is normally readable only by SYSTEM, so the service saw it as missing and
+  concluded the reader had been removed while it was sitting there scanning
+  fingerprints.
+- Presence is now read from the driver's own device list, which records the
+  hardware currently handed to that driver and shrinks when a device is removed.
+  It's readable by the service, so it reflects reality rather than permissions.
+- Anything the check can't establish still counts as "attached", so an
+  unreadable key can only cause a missed disconnect, never a false one.
+
+### Notes
+- This is in the fingerprint service — rebuild it.
+
+## [4.36.21] - 2026-07-17
+
+### Fixed
+- A connected reader was being reported as "not attached". The registry scan
+  concluded the device was gone whenever it failed to *find* it — so an entry
+  that didn't match the expected wording, or a key it wasn't allowed to read,
+  looked identical to an unplugged device.
+  - Absence is now only reported when the reader's own entry is found and shows
+    it isn't attached. Failing to identify any reader means "can't tell", and the
+    device is assumed present.
+  - The search also recognises more devices, including DigitalPersona's USB
+    vendor id and generic biometric descriptions.
+  - The heartbeat now names what it matched, e.g.
+    `usb=attached (U.are.U 4500 Fingerprint Reader)`, or says how many USB
+    devices it looked through without recognising one.
+
+### Notes
+- This is in the fingerprint service — rebuild it.
+
+## [4.36.20] - 2026-07-17
+
+### Changed
+- Reader presence is now determined from Windows' device registry rather than
+  from the SDK. Diagnostics confirmed that after unplugging, both DigitalPersona
+  answers still reported the reader as present — GetStatus returned success and
+  the SDK kept enumerating it — because both are served by the DigitalPersona
+  runtime, which caches. The service now checks whether the device is actually
+  attached according to Windows itself, which is not affected by that caching.
+  - A device's registry entry survives being unplugged, since it records the
+    driver installation. Its "Control" subkey exists only while the device is
+    physically attached, and that's what's now checked.
+  - If the registry can't be read the reader is treated as present, so a
+    permissions problem can never cause a false disconnect. The heartbeat line
+    shows which answer was used.
+
+### Notes
+- This is in the fingerprint service — rebuild it.
+
+## [4.36.19] - 2026-07-17
+
+### Changed
+- The reader health check no longer relies on GetStatus() alone. It now also
+  asks Windows whether any reader is still attached, and treats the reader as
+  healthy only if both agree. GetStatus can answer from state recorded when the
+  device was opened, which means it can keep reporting success after the reader
+  has been unplugged — a fresh enumeration doesn't go through that object, so it
+  catches the case where the reader insists it is fine.
+- The service prints a health line every 20 seconds showing what the check sees,
+  e.g. `[reader] health ok (GetStatus=DP_SUCCESS, readers=1)`. If a disconnect
+  goes unnoticed, that line distinguishes a check that isn't running from a
+  reader that is misreporting.
+
+### Notes
+- This is in the fingerprint service — rebuild it.
+
+## [4.36.18] - 2026-07-17
+
+### Changed
+- A failed reader status check is acted on immediately. GetStatus() was already
+  being called every 2 seconds, but a second consecutive failure was required
+  before the app was told — so a disconnect took about 4 seconds to show. That
+  second opinion existed to absorb "busy" replies, which are now recognised as
+  normal, so a failure is a genuine fault and waiting only delayed it.
+- The result: GetStatus() every 2 seconds, and the pill changes on the first
+  check that fails.
+
+### Notes
+- This is in the fingerprint service — rebuild it.
+
+## [4.36.17] - 2026-07-17
+
+### Fixed
+- Disconnecting the reader is detected again. The check had been narrowed to fail
+  on two specific status codes, so an unplugged reader answering with anything
+  else read as healthy. The test is now the other way round: the reader is
+  healthy if it answers normally — or reports itself busy, which is expected
+  since the check runs while a capture is in progress — and **any** other answer
+  counts as a fault. An unfamiliar answer therefore errs toward reporting a
+  problem rather than missing one, and a false alarm clears itself as soon as the
+  reader replies normally.
+- The status can no longer flicker back to "listening" in the moment between the
+  monitor declaring a fault and the capture loop noticing. Only a successful
+  re-open clears the fault.
+
+### Notes
+- This is in the fingerprint service — rebuild it.
+
+## [4.36.16] - 2026-07-17
+
+### Fixed
+- **The reader status now returns to "listening".** Reviewing the whole status
+  path turned up the actual fault: of the seven places that set a reader status,
+  six set "absent" and none set "listening" — the line that did was removed along
+  with the in-loop health check in 4.36.13. The status could therefore only ever
+  travel one way. It's set again each pass while the reader is open, so:
+  - reader working -> "Reader: listening"
+  - GetStatus reports a real fault (checked every 2 seconds) -> "Reader: not
+    connected"
+  - device plugged back in -> "Reader: listening" again on the next pass
+- Because the status is re-asserted continuously rather than only on transitions,
+  any "absent" caused by a passing glitch now clears itself as soon as the reader
+  answers again.
+
+### Notes
+- This is in the fingerprint service — rebuild it.
+
+## [4.36.15] - 2026-07-17
+
+### Fixed
+- The reader no longer shows as permanently "not connected". Moving the health
+  check onto its own thread meant it now runs *while* a capture is in progress,
+  so the reader answers "busy" — and the check treated any answer other than
+  success as a failure. A perfectly healthy reader therefore failed every check.
+  Only a genuine device fault (invalid device, device failure, a reported failure
+  state, or the SDK throwing) now counts as disconnected.
+- The service prints the reader's status code whenever it changes
+  (`[reader] GetStatus -> ...`), so what the SDK reports on unplug can be read
+  from the console rather than inferred.
+
+### Notes
+- This is in the fingerprint service — rebuild it.
+
+## [4.36.14] - 2026-07-17
+
+### Fixed
+- Reconnecting the fingerprint reader now returns the status to "listening".
+  Detection worked, but recovery didn't: when the device vanishes mid-capture the
+  SDK's capture call can block and never return, so the loop never reached the
+  code that re-acquires the reader — plugging it back in appeared to do nothing.
+  The service now notices when the capture loop has stopped making progress and
+  starts a fresh one, so the reader is picked up again within a second or two of
+  being plugged in. A stranded thread retires itself if it ever unblocks, rather
+  than competing with the new loop.
+
+### Notes
+- This is in the fingerprint service — rebuild it.
+
+## [4.36.13] - 2026-07-17
+
+### Fixed
+- **Reader disconnection is detected again.** The health check was running inside
+  the capture loop, so it could only run when a capture returned — and an
+  unplugged reader can leave that call blocked, which is precisely when the check
+  matters. It now runs on its own thread, calling the SDK's GetStatus() every 2
+  seconds regardless of what the capture loop is doing. After two consecutive
+  failures the pill switches to "Reader: not connected", the console prints the
+  reason, and the handle is closed (which also frees a blocked capture).
+
+### Added
+- Clicking outside the Assign Fingerprint window closes it.
+
+### Changed
+- Light Mode: the Male/Female buttons in that window's new-player form are
+  readable. The selected one used a single style for both themes — pale text on a
+  pale tint — which nearly disappeared on white. It's now solid blue or pink with
+  white text, and the unselected one has a visible border.
+
+### Notes
+- The reader change is in the fingerprint service — rebuild it.
+
+## [4.36.12] - 2026-07-17
+
+### Fixed
+- **The reader stopped registering fingerprints after the first scan.** Removing
+  the check-in cooldown in 4.36.10 replaced it with a "wait for the finger to be
+  lifted" rule, but that only reset on an empty frame — and the reader almost
+  never sends one. It hands back frames that fail extraction instead. So the flag
+  stayed set and every check-in after the first was discarded. Lift is now
+  detected from those frames, which is the dependable signal.
+- **Disconnection detection works again.** A single unhealthy reading now no
+  longer tears the reader down; it takes two in a row. One bad reading — the
+  device being busy mid-capture, for instance — was enough to close a perfectly
+  good reader, which also stopped it reading prints.
+- The health check still runs every 2 seconds, and now prints what it saw when it
+  fails (`[reader] health check failed (1/2) - ...`), so a fault can be read off
+  the service window instead of inferred.
+
+## [4.36.11] - 2026-07-17
+
+### Fixed
+- The fingerprint service failed to build with "does not contain a definition for
+  Enrolled / Mode / CurrentSeq". Removing the re-open probe in 4.36.10 took three
+  unrelated properties with it — the ones the /health endpoint reports. They're
+  restored, and every member the service's HTTP layer uses is now checked against
+  it.
+
+## [4.36.10] - 2026-07-17
+
+### Changed
+- The reader health check runs every 2 seconds.
+- **The reader is no longer re-opened as part of any health check.** That backstop
+  is gone entirely, so the device should stop cycling off and on while connected.
+  Health is determined solely by asking the reader for its status, including when
+  a capture throws.
+- **Check-in no longer has a 2-second wait.** A second person can scan straight
+  away. To stop a resting finger registering over and over — the capture loop
+  reports it many times a second — a check-in now counts once per press, and the
+  next is accepted as soon as the finger has been lifted. So the delay is gone
+  without the reader spamming check-ins.
+  - A finger still on the reader when enrolment finishes must be lifted before it
+    counts as a check-in.
+
+## [4.36.9] - 2026-07-17
+
+### Changed
+- Reader health is now checked by asking the reader for its status rather than
+  by re-opening the device. The query talks to the hardware, so it catches an
+  unplugged or failed reader without a reconnect — cheap enough to run about once
+  a second, which makes detection faster and far less disruptive.
+- Re-opening the device is kept as a rare backstop (once a minute, never during
+  enrolment), for the case where a reader answers "healthy" but has stopped
+  working.
+- The startup diagnostic now also reports the SDK's status-related methods and
+  properties, not just its events.
+
+## [4.36.8] - 2026-07-17
+
+### Added
+- The fingerprint service now prints the notification events its SDK exposes at
+  startup (lines beginning `[sdk]`). The well-known `OnReaderDisconnect` event
+  belongs to the older One Touch SDK (DPFP); this service is built against the
+  U.are.U SDK (DPUruNet), which is a different assembly, and whether it offers an
+  equivalent varies by version. This reports what's actually available so
+  disconnect handling can be built on the event rather than on polling.
+
+### Notes
+- Rebuild the service, then look for the `[sdk]` lines in its window at startup.
+
+## [4.36.7] - 2026-07-17
+
+### Changed
+- The reader presence check no longer re-opens the device on a fixed timer. It
+  now runs when there's a reason to: as soon as a capture comes back
+  unsuccessful, something is already wrong, so it confirms within a second.
+  Otherwise it only re-opens every 30 seconds as a safety net for a reader that
+  has died but keeps reporting success.
+- That cuts routine reconnects from about 1,800 an hour to 120, while detection
+  after a capture failure is unchanged at roughly one to two seconds.
+
+## [4.36.6] - 2026-07-17
+
+### Fixed
+- Disconnecting the fingerprint reader is now detected reliably, within about
+  two seconds.
+  - The previous checks asked the driver whether a reader was listed, and read a
+    property off the open handle. Neither is trustworthy: Windows can keep an
+    unplugged device listed, and that property is filled in when the device is
+    opened, so it answers from memory rather than from the hardware — which is
+    why the status stayed on "listening".
+  - The service now simply **re-opens the device** every couple of seconds. A
+    reader that isn't attached cannot be opened, so this can't be fooled by
+    anything cached. The same test also catches a reader that has stopped
+    responding.
+  - The probe is skipped during enrolment and doesn't log a reconnection, so it
+    stays invisible in normal use.
+
+### Notes
+- This is in the fingerprint service — close the service window and run
+  start-cuemii.bat to rebuild.
+
+## [4.36.5] - 2026-07-17
+
+### Fixed
+- Unplugging the reader is now noticed within a couple of seconds instead of the
+  status sitting on "listening".
+  - The device list alone wasn't enough: the driver can keep showing a reader
+    that has been pulled. The open handle is now probed as well, and if either
+    check says the device is gone it's treated as gone.
+  - The capture window was 5 seconds and needed three failures in a row, so up to
+    15 seconds could pass before a disconnect was acted on. It's now 1.2 seconds
+    and two failures, with the presence probe running every second.
+
+### Notes
+- This is in the fingerprint service — rebuild it (close the service window and
+  run start-cuemii.bat) for the change to take effect.
+
+## [4.36.4] - 2026-07-17
+
+### Fixed
+- Unplugging the fingerprint reader is now detected. The service checks every
+  1.5 seconds that the device is still enumerated, rather than waiting for a
+  capture to fail — pulling the reader doesn't reliably make capture fail, so the
+  status could sit on "listening" with nothing attached. The status pill switches
+  to "Reader: not connected" and the console prints a line.
+- An error thrown mid-capture is now reported as a disconnection when the device
+  has actually gone, instead of a generic reader error.
+- Every reader status change now goes through one place, so the console line and
+  the app's status always agree, and a status is printed once when it changes
+  rather than repeating.
+
+### Notes
+- This is in the fingerprint service — rebuild it for the change to take effect.
+
+## [4.36.3] - 2026-07-17
+
+### Changed
+- Reverted the reader resolution changes from 4.36.2. The service selects its
+  capture resolution exactly as it did before. The faster enrolment cooldown from
+  4.36.1 is unaffected.
+
 ## [4.36.2] - 2026-07-17
 
 ### Removed

@@ -1450,3 +1450,19 @@ body {
   background-color: #06303c !important;
   color: #9df3fb !important;
 }
+
+/* Neon: the selected gender in the Assign Fingerprint form keeps its own tint
+   rather than being flattened to the panel surface. */
+.neon .neon-panel .fp-btn.bg-blue-500\/20,
+.neon .neon-panel .fp-btn.bg-blue-600 {
+  background-color: #04162b !important;
+  border: 1px solid rgba(96, 165, 250, 0.55);
+  color: #93c5fd !important;
+}
+
+.neon .neon-panel .fp-btn.bg-pink-500\/20,
+.neon .neon-panel .fp-btn.bg-pink-500 {
+  background-color: #2a0f1e !important;
+  border: 1px solid rgba(244, 114, 182, 0.55);
+  color: #f9a8d4 !important;
+}
