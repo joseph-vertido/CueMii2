@@ -107,7 +107,7 @@ const SettingsModal = ({
                 max="99"
                 value={localSettings.noviceOverMatchThreshold}
                 onChange={(e) => updateSetting('noviceOverMatchThreshold', e.target.value)}
-                className={`w-20 px-3 py-2 rounded-lg text-center font-bold text-lg ${
+                className={`w-16 px-2 py-1 rounded-md text-center text-sm ${
                   isDarkMode 
                     ? 'bg-slate-700 border-slate-600 text-white' 
                     : 'bg-white border-slate-300 text-slate-800'
@@ -134,7 +134,7 @@ const SettingsModal = ({
                 max="99"
                 value={localSettings.noviceToNoviceThreshold}
                 onChange={(e) => updateSetting('noviceToNoviceThreshold', e.target.value)}
-                className={`w-20 px-3 py-2 rounded-lg text-center font-bold text-lg ${
+                className={`w-16 px-2 py-1 rounded-md text-center text-sm ${
                   isDarkMode 
                     ? 'bg-slate-700 border-slate-600 text-white' 
                     : 'bg-white border-slate-300 text-slate-800'
@@ -161,7 +161,7 @@ const SettingsModal = ({
                 max="99"
                 value={localSettings.repeatPairingsThreshold}
                 onChange={(e) => updateSetting('repeatPairingsThreshold', e.target.value)}
-                className={`w-20 px-3 py-2 rounded-lg text-center font-bold text-lg ${
+                className={`w-16 px-2 py-1 rounded-md text-center text-sm ${
                   isDarkMode 
                     ? 'bg-slate-700 border-slate-600 text-white' 
                     : 'bg-white border-slate-300 text-slate-800'

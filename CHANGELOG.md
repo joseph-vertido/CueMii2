@@ -14,6 +14,33 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.36.24] - 2026-07-17
+
+### Fixed
+- Neon Mode: the A-Z letters in the Add Player pickers no longer shift as the
+  highlight moves between them. The highlighted letter was given a 1px border in
+  Neon only, and those 2px were enough to push its neighbours along. The edge is
+  drawn as an inset shadow instead, which takes up no space.
+
+### Changed
+- The number selectors in Settings are more compact — narrower, tighter padding,
+  smaller text, and no longer bold.
+
+## [4.36.23] - 2026-07-17
+
+### Changed
+- The reader health heartbeat no longer prints while everything is fine. It
+  existed to diagnose detection, so the console is quiet in normal use and only
+  reports changes.
+- Everything useful still prints: a failed check and its reason, status changes,
+  connections, a stalled capture loop being restarted, and the reader's status
+  code whenever it changes.
+- The heartbeat can be brought back by setting HealthHeartbeatEvery to the number
+  of checks between lines (10 gives the previous 20-second cadence).
+
+### Notes
+- This is in the fingerprint service — rebuild it.
+
 ## [4.36.22] - 2026-07-17
 
 ### Fixed

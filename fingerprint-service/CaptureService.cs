@@ -71,6 +71,9 @@ namespace CueMiiFingerprintService
         // the device without disturbing it. The reader is never re-opened as
         // part of a health check — doing that made it cycle off and on.
         private const int HealthCheckMs = 2000;
+        // Checks between routine "still fine" lines; 0 turns them off. Failures
+        // and status changes are always reported regardless.
+        private const int HealthHeartbeatEvery = 0;
         // What the last health check actually saw, so a failure can be diagnosed
         // from the service window rather than guessed at.
         private string _lastHealthDetail = "";
@@ -434,12 +437,13 @@ namespace CueMiiFingerprintService
 
                 if (_reader == null) continue; // nothing open yet; the loop is acquiring
 
+                // Nothing is printed while the reader is well — the console only
+                // reports changes. Set HealthHeartbeatEvery above 0 to bring back
+                // a periodic line showing what the check sees, which is useful
+                // when diagnosing a reader that isn't being detected properly.
                 if (ReaderReportsHealthy())
                 {
-                    // A periodic line proving the check is running and showing
-                    // what it sees — so if a disconnect goes unnoticed it's clear
-                    // whether the check isn't running or the reader is lying.
-                    if (++_healthTicks % 10 == 0)
+                    if (HealthHeartbeatEvery > 0 && ++_healthTicks % HealthHeartbeatEvery == 0)
                     {
                         Console.WriteLine("[reader] health " + _lastHealthDetail);
                     }
