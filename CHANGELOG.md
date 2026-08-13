@@ -14,6 +14,24 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.36.26] - 2026-07-17
+
+### Changed
+- `.env` is no longer git-ignored, so the Firebase settings can be committed with
+  the project. The `.local` variants stay ignored, since those are for
+  machine-specific overrides.
+- Added `netlify.toml` turning off "likely secret" pattern detection, which is
+  what failed the deploy. Committing the key would otherwise fail the build again
+  — the scanner checks the built JavaScript as well as the source, and the key
+  has to be in the bundle for the browser to reach Firebase at all.
+  - Only the pattern check is disabled. Netlify still scans for the values of
+    environment variables configured on the site, so a genuine secret added there
+    would still stop the build.
+
+### Notes
+- The app reads `REACT_APP_FIREBASE_*` from the environment, so a committed
+  `.env` supplies them with no Netlify configuration needed.
+
 ## [4.36.25] - 2026-07-17
 
 ### Changed

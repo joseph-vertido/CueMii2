@@ -1,6 +1,6 @@
 # BADDIXX CueMii App
 
-**Version 4.36.25**
+**Version 4.36.26**
 
 A comprehensive badminton queuing and court management system built with React and Tailwind CSS.
 
@@ -252,6 +252,8 @@ and compares it to the running `APP_VERSION`. Once a bumped version is pushed to
 > below is retained for legacy history.
 
 ## Version History
+
+- **v4.36.26** - .env committed; Netlify secret pattern scan disabled
 
 - **v4.36.25** - Firebase config moved to environment variables
 

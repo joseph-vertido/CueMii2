@@ -9,6 +9,10 @@ build/
 *.log
 
 # Environment files
+# .env is committed deliberately: the Firebase web config it holds identifies
+# the project rather than granting access, and is visible in any browser that
+# loads the app. Access is controlled by the Firestore security rules.
+# The .local variants stay ignored - those are for machine-specific overrides.
 .env.local
 .env.development.local
 .env.test.local

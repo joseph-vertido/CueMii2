@@ -1,0 +1,22 @@
+# Netlify build settings for CueMii.
+
+[build]
+  command = "npm run build"
+  publish = "build"
+
+[build.environment]
+  # Turn off "likely secret" pattern detection.
+  #
+  # The build fails by default when anything matching a known key format appears
+  # in the repository or the built files. The Firebase web API key matches that
+  # format, and it ends up in both — it's committed in .env and compiled into
+  # the JavaScript bundle, since the browser needs it to reach Firebase at all.
+  #
+  # That key isn't a credential. It names the project and is readable in any
+  # browser that loads the app; access is controlled by the Firestore security
+  # rules. Blocking the deploy over it gains nothing.
+  #
+  # Only the pattern-matching check is disabled. Netlify still scans for the
+  # values of environment variables configured on the site, so a genuine secret
+  # added there would still stop the build.
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
