@@ -252,16 +252,49 @@ export const twoWaySync = async (localPlayers, setPlayers, localDeleted = {}, se
   // single entry (the most recently updated). This prevents the "two copies of
   // each player" duplication regardless of how it arises, and heals the cloud
   // on push.
+  // One record per name, and — importantly — always the *same* id for that name
+  // on every machine.
+  //
+  // Two browsers can each create the same person before either has synced, which
+  // leaves two records with one name and different ids. Keeping whichever was
+  // edited most recently isn't enough: it settles on the newer id and deletes the
+  // older one, then the machine still holding the older id uploads it again on
+  // its next sync, and the pair reappears.
+  //
+  // So the *oldest* id wins, since ids are creation timestamps and every machine
+  // can agree on which is oldest without coordinating. The most recent details
+  // are kept, but carried onto that id. The discarded ids are recorded as
+  // deletions so they're removed from the cloud and stay removed.
   const byName = new Map();
   const unnamed = [];
+  const supersededIds = {};
+
   for (const p of mergedPlayers) {
     const key = (p.name || '').trim().toLowerCase();
     if (!key) { unnamed.push(p); continue; }
+
     const existing = byName.get(key);
-    if (!existing || (p.updatedAt || 0) > (existing.updatedAt || 0)) {
-      byName.set(key, p);
+    if (!existing) { byName.set(key, p); continue; }
+
+    // Newest details...
+    const newer = (p.updatedAt || 0) > (existing.updatedAt || 0) ? p : existing;
+    const older = newer === p ? existing : p;
+
+    // ...under the oldest id.
+    const keepId = Number(older.id) < Number(newer.id) ? older.id : newer.id;
+    const dropId = keepId === older.id ? newer.id : older.id;
+
+    if (String(dropId) !== String(keepId)) {
+      supersededIds[String(dropId)] = {
+        id: dropId,
+        name: newer.name || older.name || '',
+        deletedAt: Date.now(),
+      };
     }
+
+    byName.set(key, { ...newer, id: keepId });
   }
+
   let finalPlayers = [...byName.values(), ...unnamed];
 
   // Apply the deletion markers. A player stays deleted unless they were edited
@@ -278,6 +311,12 @@ export const twoWaySync = async (localPlayers, setPlayers, localDeleted = {}, se
   // Keep markers for players nobody holds any more, so the deletion keeps
   // propagating to machines that haven't synced yet.
   for (const [id, mark] of Object.entries(tombstones)) {
+    if (!finalPlayers.some(p => p.id.toString() === id)) survivingTombstones[id] = mark;
+  }
+
+  // Discarded duplicate ids are treated the same way as deletions, so the cloud
+  // copy is removed and no machine can bring it back.
+  for (const [id, mark] of Object.entries(supersededIds)) {
     if (!finalPlayers.some(p => p.id.toString() === id)) survivingTombstones[id] = mark;
   }
   if (setDeleted) setDeleted(survivingTombstones);

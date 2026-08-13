@@ -382,6 +382,13 @@ function App() {
   const reviveDeletedId = (name) => {
     const key = (name || '').trim().toLowerCase();
     if (!key) return null;
+
+    // If this name is already in the database, reuse that record's id rather
+    // than minting a new one — two ids for one name is what lets duplicates
+    // reach the cloud.
+    const live = players.find(p => (p.name || '').trim().toLowerCase() === key);
+    if (live) return live.id;
+
     const match = Object.values(deletedPlayers)
       .find(t => (t.name || '').trim().toLowerCase() === key);
     if (!match) return null;

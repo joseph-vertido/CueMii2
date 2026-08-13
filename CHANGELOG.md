@@ -14,6 +14,25 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.36.29] - 2026-07-17
+
+### Fixed
+- **The same player name can no longer end up with two ids in the database.**
+  - Creating a player whose name already exists now reuses that record's id
+    instead of minting a new one.
+  - When a sync does find one name under two ids, it now settles on the *oldest*
+    id and carries the most recent details onto it. Ids are creation times, so
+    every machine picks the same winner without needing to agree first. The
+    discarded id is recorded as a deletion, so it's removed from the cloud and
+    can't be reintroduced.
+
+### Notes
+- The previous rule kept whichever record was edited most recently, which meant
+  keeping the *newer* id. Each browser then deleted the other's record and
+  uploaded its own on the next sync, so the pair kept reappearing instead of
+  settling — which is how two ids for one name survived.
+- Existing duplicates are cleaned up automatically on the next sync.
+
 ## [4.36.28] - 2026-07-17
 
 ### Fixed
