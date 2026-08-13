@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CueMiiFingerprintService")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+589cea9f3d5d367740cff0828c2e2cda782dd335")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d983bd94829370de42b0c1a19c5e4420a9bfa220")]
 [assembly: System.Reflection.AssemblyProductAttribute("CueMiiFingerprintService")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CueMiiFingerprintService")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -22,15 +22,25 @@ import {
   orderBy
 } from 'firebase/firestore';
 
-// Firebase configuration for CueMii Database
+// Firebase configuration for CueMii Database.
+//
+// Read from the environment rather than written here. A Firebase web API key
+// isn't a credential — it identifies the project and is visible in any browser
+// that loads the app — but automated secret scanners flag the "AIza..." pattern
+// on sight, which fails the deploy. Keeping it out of the source avoids that,
+// and means a different project can be pointed at without editing code.
+//
+// Local development: put these in a .env file (see .env.example).
+// Netlify: set them under Site settings > Environment variables.
+// The fallbacks keep existing local installs working with no setup.
 const firebaseConfig = {
-  apiKey: "AIzaSyAHgH2IFI6kMs6jZgIHckbKuGazJ6rL17g",
-  authDomain: "cuemii-database.firebaseapp.com",
-  projectId: "cuemii-database",
-  storageBucket: "cuemii-database.firebasestorage.app",
-  messagingSenderId: "129349819856",
-  appId: "1:129349819856:web:83522e76bb1fcb78c9add5",
-  measurementId: "G-YBZDH11K3T"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "",
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "cuemii-database.firebaseapp.com",
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "cuemii-database",
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "cuemii-database.firebasestorage.app",
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "129349819856",
+  appId: process.env.REACT_APP_FIREBASE_APP_ID || "",
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID || "G-YBZDH11K3T"
 };
 
 // Initialize Firebase
@@ -39,7 +49,14 @@ let db = null;
 let isInitialized = false;
 let initError = null;
 
+// With no API key there is nothing to connect to, so don't try: initialising
+// without one throws, and the app should simply run locally instead.
+const hasConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+
 try {
+  if (!hasConfig) {
+    throw new Error('Firebase not configured - set REACT_APP_FIREBASE_* environment variables');
+  }
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
   

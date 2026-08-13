@@ -14,6 +14,26 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.36.25] - 2026-07-17
+
+### Changed
+- The Firebase settings are read from environment variables instead of being
+  written into the source, which was failing deploys — automated secret scanners
+  flag the "AIza..." key pattern on sight.
+- A `.env.example` shows the names to set. `.env` is already git-ignored, so real
+  values stay out of the repository; on Netlify the same names go under Site
+  settings > Environment variables.
+- With no key configured the app starts with cloud sync unavailable and keeps
+  everything locally, rather than failing.
+
+### Notes
+- **Deploys need the variables set before cloud sync will work.** Add the
+  REACT_APP_FIREBASE_* values from `.env.example` to the host's environment
+  settings, using the values previously in `src/utils/firebase.js` (they're in
+  your Firebase console under Project settings > General).
+- The other values keep their previous defaults, so an existing local install
+  only needs the API key and app id supplied to reconnect.
+
 ## [4.36.24] - 2026-07-17
 
 ### Fixed
