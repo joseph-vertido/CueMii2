@@ -14,6 +14,35 @@ The current version is defined in `package.json` and mirrored to
 
 ---
 
+## [4.36.28] - 2026-07-17
+
+### Fixed
+- A working `.env` is now included, so a fresh copy of the project connects to
+  Firebase without any setup. Only `.env.example` was shipped previously, so
+  running locally reported the configuration as missing.
+- Running without Firebase settings no longer looks like a crash. It's a
+  supported state — the app keeps everything locally — so it's now reported as a
+  notice explaining how to enable cloud sync, rather than a red error with a
+  stack trace. Genuine initialisation failures are still shown as errors.
+
+### Notes
+- The dev server reads `.env` only at startup, so restart `npm start` after
+  changing it.
+
+## [4.36.27] - 2026-07-17
+
+### Changed
+- The fonts are now bundled with the app instead of being fetched from Google at
+  page load. That request could be blocked — Firefox's tracking protection treats
+  a hosted domain differently from localhost, and ad blockers commonly block it —
+  in which case the browser quietly fell back to a system font, so the same build
+  looked different from one machine to another.
+  - It also means the typeface is correct on a kiosk with no internet, where the
+    request could never have succeeded.
+  - Only the weights the interface uses are included, and browsers download only
+    the character subsets the page needs, so the practical cost is small.
+  - The app no longer contacts any third party to render.
+
 ## [4.36.26] - 2026-07-17
 
 ### Changed

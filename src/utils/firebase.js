@@ -53,9 +53,19 @@ let initError = null;
 // without one throws, and the app should simply run locally instead.
 const hasConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 
+if (!hasConfig) {
+  // Not an error: the app is designed to run without cloud sync, keeping
+  // everything locally. Reported as a notice so it doesn't look like a fault.
+  console.info(
+    'CueMii: cloud sync is off (no Firebase settings found). ' +
+    'To enable it, copy .env.example to .env, fill in the values, and restart ' +
+    'the dev server — .env is only read at startup.'
+  );
+}
+
 try {
   if (!hasConfig) {
-    throw new Error('Firebase not configured - set REACT_APP_FIREBASE_* environment variables');
+    throw new Error('NO_CONFIG');
   }
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
@@ -71,7 +81,11 @@ try {
   
   isInitialized = true;
 } catch (error) {
-  console.error('Firebase initialization error:', error);
+  // A missing configuration has already been explained above; anything else is
+  // a genuine failure worth surfacing.
+  if (error && error.message !== 'NO_CONFIG') {
+    console.error('Firebase initialization error:', error);
+  }
   initError = error;
 }
 
